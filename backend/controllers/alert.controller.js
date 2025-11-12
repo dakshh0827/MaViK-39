@@ -1,6 +1,10 @@
-import prisma from '../config/database.js';
-import logger from '../utils/logger.js';
-import { filterDataByRole } from '../middlewares/rbac.js';
+// =====================================================
+// backend/controllers/alert.controller.js (FIXED)
+// =====================================================
+
+import prisma from "../config/database.js";
+import logger from "../utils/logger.js";
+import { filterDataByRole } from "../middlewares/rbac.js";
 
 const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -16,7 +20,7 @@ class AlertController {
     const where = {
       equipment: roleFilter,
       ...(severity && { severity }),
-      ...(isResolved !== undefined && { isResolved: isResolved === 'true' }),
+      ...(isResolved !== undefined && { isResolved: isResolved === "true" }),
     };
 
     const [alerts, total] = await Promise.all([
@@ -24,12 +28,20 @@ class AlertController {
         where,
         include: {
           equipment: {
-            select: { equipmentId: true, name: true, location: true },
+            // --- THIS IS THE FIX ---
+            // 'location' does not exist on the Equipment model.
+            // We will select the 'lab' name instead, which is more useful.
+            select: {
+              equipmentId: true,
+              name: true,
+              lab: { select: { name: true } },
+            },
+            // --- END FIX ---
           },
         },
         skip: parseInt(skip),
         take: parseInt(limit),
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       }),
       prisma.alert.count({ where }),
     ]);
@@ -60,12 +72,14 @@ class AlertController {
       logger.info(`Alert ${req.params.id} resolved by ${req.user.email}`);
       res.json({
         success: true,
-        message: 'Alert resolved successfully.',
+        message: "Alert resolved successfully.",
         data: alert,
       });
     } catch (error) {
-      if (error.code === 'P2025') {
-        return res.status(404).json({ success: false, message: 'Alert not found.' });
+      if (error.code === "P2025") {
+        return res
+          .status(404)
+          .json({ success: false, message: "Alert not found." });
       }
       throw error;
     }

@@ -1,5 +1,5 @@
 // =====================================================
-// 2. src/stores/authStore.js
+// 2. src/stores/authStore.js (MODIFIED)
 // =====================================================
 
 import { create } from "zustand";
@@ -7,9 +7,9 @@ import api from "../lib/axios";
 
 export const useAuthStore = create((set, get) => ({
   user: null,
-  token: localStorage.getItem("token"),
+  accessToken: null, // We store the access token in memory
   isAuthenticated: false,
-  isLoading: true,
+  isLoading: true, // Start as true to allow checkAuth to run
 
   register: async (userData) => {
     try {
@@ -23,9 +23,10 @@ export const useAuthStore = create((set, get) => ({
   verifyEmail: async (email, otp) => {
     try {
       const response = await api.post("/auth/verify-email", { email, otp });
-      const { token, user } = response.data.data;
-      localStorage.setItem("token", token);
-      set({ user, token, isAuthenticated: true });
+      // The backend now sends 'accessToken'
+      const { accessToken, user } = response.data.data;
+      // No more localStorage
+      set({ user, accessToken, isAuthenticated: true });
       return response.data;
     } catch (error) {
       throw error.response?.data || error;
@@ -44,39 +45,47 @@ export const useAuthStore = create((set, get) => ({
   login: async (email, password) => {
     try {
       const response = await api.post("/auth/login", { email, password });
-      const { token, user } = response.data.data;
-      localStorage.setItem("token", token);
-      set({ user, token, isAuthenticated: true });
+      // The backend now sends 'accessToken'
+      const { accessToken, user } = response.data.data;
+      // No more localStorage
+      set({ user, accessToken, isAuthenticated: true });
       return response.data;
     } catch (error) {
       throw error.response?.data || error;
     }
   },
 
-  logout: () => {
-    localStorage.removeItem("token");
-    set({ user: null, token: null, isAuthenticated: false });
+  logout: async () => {
+    try {
+      // Call the backend to clear the HttpOnly cookie
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    } finally {
+      // Always clear the client-side state
+      set({ user: null, accessToken: null, isAuthenticated: false });
+    }
   },
 
   checkAuth: async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      set({ isLoading: false, isAuthenticated: false });
-      return;
-    }
-
+    // This function will now try to get the user profile.
+    // The axios interceptor will handle refreshing if the token is expired.
+    set({ isLoading: true });
     try {
       const response = await api.get("/auth/profile");
+      // If this succeeds, the interceptor either used a valid accessToken
+      // or successfully refreshed it.
       set({
         user: response.data.data,
         isAuthenticated: true,
         isLoading: false,
+        // The token is already in state, set by the interceptor if it refreshed
       });
     } catch (error) {
-      localStorage.removeItem("token");
+      // If this fails, it means the refresh token was invalid or expired
       set({
         user: null,
-        token: null,
+        accessToken: null,
         isAuthenticated: false,
         isLoading: false,
       });
