@@ -5,7 +5,6 @@
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Menu,
-  X,
   Home,
   FileText,
   MessageSquare,
@@ -18,7 +17,7 @@ import { useState } from "react";
 import { useAuthStore } from "../../stores/authStore";
 
 export default function DashboardLayout() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,84 +36,110 @@ export default function DashboardLayout() {
     { icon: User, label: "Profile", path: "/profile" },
   ];
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="lg:hidden p-2 rounded-md text-gray-600 hover:bg-gray-100"
-              >
-                {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
-              <h1 className="ml-4 text-xl font-bold text-blue-900">
-                IoT Equipment Monitor
-              </h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600 hidden sm:block">
-                {user?.firstName} {user?.lastName}
-              </span>
-              <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                {user?.role?.replace("_", " ")}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
-                title="Logout"
-              >
-                <LogOut size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+  const sidebarWidth = isSidebarCollapsed ? "5rem" : "16rem";
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside
-          className={`${
-            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transition-transform duration-300 ease-in-out`}
-        >
-          <nav className="mt-8 px-4 space-y-2">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+  return (
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+      {/* SIDEBAR */}
+      <aside
+        className={`
+          fixed left-0 top-0 inset-y-0 bg-white border-r border-gray-200
+          transition-all duration-300 z-50
+          ${isSidebarCollapsed ? "w-20" : "w-64"}
+        `}
+      >
+        {/* Sidebar Header */}
+        <div className="h-16 flex items-center px-4">
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
+          >
+            <Menu size={22} />
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="mt-4 px-3 space-y-2">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center rounded-lg transition-all duration-300
+                  ${isSidebarCollapsed ? "gap-0 px-3 py-3" : "gap-3 px-3 py-3"}
+                  ${
                     isActive
                       ? "bg-blue-50 text-blue-900 font-medium"
                       : "text-gray-700 hover:bg-blue-50 hover:text-blue-900"
-                  }`}
-                  onClick={() => setIsSidebarOpen(false)}
-                >
+                  }
+                `}
+              >
+                {/* Icon Wrapper to avoid shifting */}
+                <div className="w-6 flex justify-center">
                   <item.icon size={20} />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
+                </div>
 
-        {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
-          <Outlet />
-        </main>
-      </div>
+                {/* LABEL WITH SMOOTH FADE */}
+                <span
+                  className={`
+                    whitespace-nowrap
+                    transition-all duration-300 
+                    ${
+                      isSidebarCollapsed
+                        ? "opacity-0 w-0"
+                        : "opacity-100 w-auto"
+                    }
+                  `}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
 
-      {/* Mobile overlay */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
+      {/* NAVBAR */}
+      <header
+        className="fixed top-0 h-16 bg-white z-40 flex items-center justify-between px-6"
+        style={{
+          left: sidebarWidth,
+          right: 0,
+        }}
+      >
+        <h1 className="text-lg font-bold text-blue-900">
+          IoT Equipment Monitor
+        </h1>
+
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600 hidden sm:block">
+            {user?.firstName} {user?.lastName}
+          </span>
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+            {user?.role?.replace("_", " ")}
+          </span>
+          <button
+            onClick={handleLogout}
+            className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
+      </header>
+
+      {/* MAIN CONTENT */}
+      <main
+        className="p-4 sm:p-6 lg:p-8 overflow-auto"
+        style={{
+          marginLeft: sidebarWidth,
+          paddingTop: "4.5rem",
+          transition: "margin-left 0.3s ease",
+        }}
+      >
+        <Outlet />
+      </main>
     </div>
   );
 }

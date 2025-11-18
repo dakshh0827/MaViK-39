@@ -1,6 +1,6 @@
 /*
  * =====================================================
- * LabManagerDashboard.jsx - FIXED with Proper Institute Loading
+ * LabManagerDashboard.jsx - ORIGINAL UI + STATE ISOLATION FIX
  * =====================================================
  */
 import { useEffect, useState } from "react";
@@ -12,6 +12,7 @@ import { useLabStore } from "../../stores/labStore";
 import StatCard from "../../components/common/StatCard";
 import EquipmentTable from "../../components/dashboard/EquipmentTable";
 import AlertsList from "../../components/dashboard/AlertsList";
+import AlertHistoryTable from "../../components/dashboard/AlertHistoryTable";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import EquipmentFormModal from "../../components/equipment/EquipmentFormModal";
 import {
@@ -24,6 +25,8 @@ import {
   Filter,
   Download,
   BarChart2,
+  History,
+  List,
 } from "lucide-react";
 
 const DEPARTMENT_DISPLAY_NAMES = {
@@ -41,8 +44,8 @@ const DEPARTMENT_DISPLAY_NAMES = {
 // Helper function to safely get institute name
 const getInstituteName = (institute) => {
   if (!institute) return "Loading...";
-  if (typeof institute === 'string') return institute;
-  if (typeof institute === 'object') {
+  if (typeof institute === "string") return institute;
+  if (typeof institute === "object") {
     return institute.name || institute.instituteId || "Unknown Institute";
   }
   return "Unknown Institute";
@@ -50,7 +53,11 @@ const getInstituteName = (institute) => {
 
 export default function LabManagerDashboard() {
   const { user, checkAuth } = useAuthStore();
-  const { overview, fetchOverview, isLoading: dashboardLoading } = useDashboardStore();
+  const {
+    overview,
+    fetchOverview,
+    isLoading: dashboardLoading,
+  } = useDashboardStore();
   const {
     equipment,
     fetchEquipment,
@@ -59,7 +66,10 @@ export default function LabManagerDashboard() {
     deleteEquipment,
     isLoading: equipmentLoading,
   } = useEquipmentStore();
-  const { alerts, fetchAlerts, resolveAlert } = useAlertStore();
+
+  // STATE ISOLATION FIX: We only use the actions, not the 'alerts' state from the store
+  const { fetchAlerts, resolveAlert } = useAlertStore();
+
   const {
     labs,
     fetchLabs,
@@ -76,43 +86,100 @@ export default function LabManagerDashboard() {
   const [editingEquipment, setEditingEquipment] = useState(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // ✅ FIXED: Ensure user profile (including institute) is fully loaded
+  // --- NEW: ISOLATED STATE FOR ALERTS ---
+  const [alertTab, setAlertTab] = useState("active"); // 'active' | 'history'
+
+  // Separate buckets for data so they never overwrite each other
+  const [activeAlerts, setActiveAlerts] = useState([]);
+  const [isActiveAlertsLoading, setIsActiveAlertsLoading] = useState(true);
+
+  const [historyAlerts, setHistoryAlerts] = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  // Ensure user profile (including institute) is fully loaded
   useEffect(() => {
     const ensureUserDataLoaded = async () => {
       if (!user?.institute) {
-        console.log('🔄 User institute not loaded, fetching profile...');
         try {
           await checkAuth();
         } catch (error) {
-          console.error('Failed to load user profile:', error);
+          console.error("Failed to load user profile:", error);
         }
       }
       setIsInitialLoad(false);
     };
-    
+
     ensureUserDataLoaded();
   }, []);
 
+  // Initial Data Load
   useEffect(() => {
-    // Only load dashboard data after user data is ready
     if (!isInitialLoad && user) {
       loadDashboardData();
     }
   }, [isInitialLoad, user?.id]);
 
+  // --- ISOLATED FETCH FUNCTIONS ---
+
+  const parseAlertResponse = (response) => {
+    // Handle potential response structures (array vs { data: [] })
+    if (Array.isArray(response)) return response;
+    if (response && response.data && Array.isArray(response.data))
+      return response.data;
+    return [];
+  };
+
+  const fetchActiveAlertsIsolated = async () => {
+    setIsActiveAlertsLoading(true);
+    try {
+      const response = await fetchAlerts({ isResolved: false });
+      setActiveAlerts(parseAlertResponse(response));
+    } catch (error) {
+      console.error("Failed to fetch active alerts:", error);
+    } finally {
+      setIsActiveAlertsLoading(false);
+    }
+  };
+
+  const fetchHistoryAlertsIsolated = async () => {
+    setIsHistoryLoading(true);
+    try {
+      const response = await fetchAlerts({ isResolved: true, limit: 50 });
+      setHistoryAlerts(parseAlertResponse(response));
+    } catch (error) {
+      console.error("Failed to fetch history alerts:", error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
   const loadDashboardData = async () => {
     try {
-      console.log('📊 Loading Lab Manager Dashboard data...');
+      console.log("📊 Loading Lab Manager Dashboard data...");
       await Promise.all([
         fetchOverview(),
         fetchEquipment(),
-        fetchAlerts({ isResolved: false }),
         fetchLabs(),
+        fetchActiveAlertsIsolated(), // Fetch active alerts into local state
       ]);
       clearLabSummary();
-      console.log('✅ Dashboard data loaded successfully');
+      console.log("✅ Dashboard data loaded successfully");
     } catch (error) {
       console.error("❌ Failed to load dashboard data:", error);
+    }
+  };
+
+  // --- HANDLERS ---
+
+  const handleTabChange = (tab) => {
+    setAlertTab(tab);
+    // Lazy load history if empty
+    if (tab === "history" && historyAlerts.length === 0) {
+      fetchHistoryAlertsIsolated();
+    }
+    // Optional: Refresh active when switching back to active to ensure freshness
+    if (tab === "active") {
+      fetchActiveAlertsIsolated();
     }
   };
 
@@ -177,10 +244,17 @@ export default function LabManagerDashboard() {
   const handleResolveAlert = async (alertId) => {
     try {
       await resolveAlert(alertId);
-      await Promise.all([
-        fetchAlerts({ isResolved: false }),
-        fetchOverview(),
-      ]);
+
+      // 1. Update Stats
+      fetchOverview();
+
+      // 2. Update Active List (Active Tab)
+      await fetchActiveAlertsIsolated();
+
+      // 3. Update History List (History Tab) - force refresh
+      if (historyAlerts.length > 0 || alertTab === "history") {
+        fetchHistoryAlertsIsolated();
+      }
     } catch (error) {
       console.error("Failed to resolve alert:", error);
       alert("Failed to resolve alert. Please try again.");
@@ -288,6 +362,7 @@ export default function LabManagerDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -295,7 +370,9 @@ export default function LabManagerDashboard() {
           </h1>
           <p className="text-gray-600 mt-1">
             {getInstituteName(user?.institute)} |{" "}
-            {DEPARTMENT_DISPLAY_NAMES[user?.department] || user?.department || "Unknown Department"}
+            {DEPARTMENT_DISPLAY_NAMES[user?.department] ||
+              user?.department ||
+              "Unknown Department"}
           </p>
         </div>
         <button
@@ -307,12 +384,14 @@ export default function LabManagerDashboard() {
         </button>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
           <StatCard key={index} {...stat} />
         ))}
       </div>
 
+      {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
         <div className="flex items-center gap-2 mb-4">
           <Filter className="w-5 h-5 text-gray-600" />
@@ -369,8 +448,10 @@ export default function LabManagerDashboard() {
         </div>
       </div>
 
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-6">
+          {/* My Labs List */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-100">
             <div className="p-4 border-b border-gray-200">
               <h3 className="font-semibold">My Labs</h3>
@@ -408,6 +489,7 @@ export default function LabManagerDashboard() {
             </div>
           </div>
 
+          {/* Lab Analytics (Full Original UI) */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
             <h2 className="text-xl font-semibold mb-4">Lab Analytics</h2>
             {labLoading ? (
@@ -468,12 +550,15 @@ export default function LabManagerDashboard() {
         </div>
 
         <div className="lg:col-span-2">
+          {/* Equipment Table */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-100">
             <div className="p-4 border-b border-gray-200">
               <h2 className="text-xl font-semibold">
                 Equipment{" "}
                 {selectedLabId !== "all"
-                  ? `(Lab: ${labs.find((l) => l.labId === selectedLabId)?.name})`
+                  ? `(Lab: ${
+                      labs.find((l) => l.labId === selectedLabId)?.name
+                    })`
                   : "(All Labs)"}
               </h2>
             </div>
@@ -508,16 +593,69 @@ export default function LabManagerDashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-        <h2 className="text-xl font-semibold mb-4">Recent Alerts</h2>
-        <AlertsList alerts={alerts.slice(0, 5)} onResolve={handleResolveAlert} />
+      {/* Alerts Section (With Tab Logic and Isolated State) */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h2 className="text-xl font-semibold">Alerts</h2>
+
+          {/* Tab Switcher */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => handleTabChange("active")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                alertTab === "active"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <List className="w-4 h-4" />
+              Active Alerts
+            </button>
+            <button
+              onClick={() => handleTabChange("history")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                alertTab === "history"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <History className="w-4 h-4" />
+              Alert History
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {alertTab === "active" ? (
+            // Active Alerts View (Uses Isolated Local State)
+            isActiveAlertsLoading ? (
+              <div className="flex justify-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : (
+              <AlertsList
+                alerts={activeAlerts}
+                onResolve={handleResolveAlert}
+              />
+            )
+          ) : (
+            // History View (Uses Isolated Local State)
+            <AlertHistoryTable
+              alerts={historyAlerts}
+              loading={isHistoryLoading}
+            />
+          )}
+        </div>
       </div>
 
+      {/* Modal */}
       {isModalOpen && (
         <EquipmentFormModal
           isOpen={isModalOpen}
           onClose={handleModalClose}
-          onSubmit={editingEquipment ? handleUpdateEquipment : handleCreateEquipment}
+          onSubmit={
+            editingEquipment ? handleUpdateEquipment : handleCreateEquipment
+          }
           equipment={editingEquipment}
         />
       )}

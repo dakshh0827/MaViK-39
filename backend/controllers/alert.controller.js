@@ -13,41 +13,57 @@ class AlertController {
     const skip = (page - 1) * limit;
     const roleFilter = filterDataByRole(req);
 
+    // ✅ FIX: Safely convert string query params to Booleans
+    let resolvedFilter = undefined;
+    if (isResolved === "true") resolvedFilter = true;
+    if (isResolved === "false") resolvedFilter = false;
+
     const where = {
       equipment: roleFilter,
       ...(severity && { severity }),
-      ...(isResolved !== undefined && { isResolved: isResolved === "true" }),
+      // Only add isResolved to query if it's actually defined
+      ...(resolvedFilter !== undefined && { isResolved: resolvedFilter }),
     };
 
-    const [alerts, total] = await Promise.all([
-      prisma.alert.findMany({
-        where,
-        include: {
-          equipment: {
-            select: {
-              equipmentId: true,
-              name: true,
-              lab: { select: { name: true, institute: true } },
+    try {
+      const [alerts, total] = await Promise.all([
+        prisma.alert.findMany({
+          where,
+          include: {
+            equipment: {
+              select: {
+                equipmentId: true,
+                name: true,
+                lab: { select: { name: true, institute: true } },
+              },
             },
           },
-        },
-        skip: parseInt(skip),
-        take: parseInt(limit),
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.alert.count({ where }),
-    ]);
+          skip: parseInt(skip),
+          take: parseInt(limit),
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.alert.count({ where }),
+      ]);
 
-    res.json({
-      success: true,
-      data: alerts,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / limit),
-      },
-    });
+      res.json({
+        success: true,
+        data: alerts,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      logger.error(`Error fetching alerts: ${error.message}`);
+      // Return a clean error so the frontend doesn't crash hard
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch alerts",
+        error: error.message,
+      });
+    }
   });
 
   // Resolve alert
