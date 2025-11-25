@@ -1,9 +1,15 @@
-// =====================================================
-// PolicyMakerDashboard.jsx (Layout Adjusted)
-// =====================================================
+/*
+ * =====================================================
+ * PolicyMakerDashboard.jsx - REMOVED CREATE BUTTONS
+ * =====================================================
+ * 1. Removed 'Create New Lab' card from the Grid View.
+ * 2. Removed '+ Create New Lab' button from the List View.
+ * 3. Preserved all Modal/Portal fixes and existing logic.
+ */
 
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { useDashboardStore } from "../../stores/dashboardStore";
 import { useAlertStore } from "../../stores/alertStore";
 import { useLabStore } from "../../stores/labStore";
@@ -41,7 +47,7 @@ import {
   History,
   MessageSquare,
   Clock,
-  UserCheck
+  UserCheck,
 } from "lucide-react";
 
 const DEPARTMENT_DISPLAY_NAMES = {
@@ -56,52 +62,113 @@ const DEPARTMENT_DISPLAY_NAMES = {
   AUTOMOTIVE_MECHANIC: "Automotive/Mechanic",
 };
 
-// --- UPDATED: SVG Health History Chart (Wider Internal Resolution) ---
+// --- CSS STYLE TO FORCE-FIX CHILD MODALS ---
+const modalStripperStyle = `
+  /* Target ALL fixed/absolute position elements inside modal-stripper */
+  .modal-stripper * {
+    position: static !important;
+  }
+  
+  /* Allow only the direct content card to have relative positioning */
+  .modal-stripper > *:last-child {
+    position: relative !important;
+  }
+  
+  /* Strip all background overlays and backdrops */
+  .modal-stripper div[class*="fixed"],
+  .modal-stripper div[class*="absolute"],
+  .modal-stripper div[class*="inset"],
+  .modal-stripper div[class*="bg-black"],
+  .modal-stripper div[class*="bg-gray-900"],
+  .modal-stripper div[class*="bg-slate"] {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+  }
+  
+  /* Ensure no pseudo-element overlays */
+  .modal-stripper::before,
+  .modal-stripper::after {
+    display: none !important;
+  }
+`;
+
+// --- UPDATED: Modal Wrapper ---
+const ModalWrapper = ({ children, onClose }) => {
+  // Close on Escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <style>{modalStripperStyle}</style>
+
+      {/* Content Container */}
+      <div
+        className="modal-stripper relative w-auto max-w-4xl max-h-[90vh] overflow-y-auto p-4 flex flex-col items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// --- SVG Health History Chart ---
 const HealthHistoryChart = ({ currentScore = 0 }) => {
   const chartData = useMemo(() => {
     const today = new Date();
     const months = [];
-    
-    // Generate Last 6 Months Labels
+
     for (let i = 5; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      months.push(d.toLocaleString('default', { month: 'short' }));
+      months.push(d.toLocaleString("default", { month: "short" }));
     }
 
     const safeScore = currentScore || 0;
 
     return months.map((m, i) => {
-      // The last point MUST match the actual Current Score
       if (i === 5) {
         return { month: m, score: safeScore };
       }
-      // Previous months: Simulate variance
       const variance = Math.floor(Math.random() * 20) - 10;
       const calculatedScore = Math.max(0, Math.min(100, safeScore + variance));
-      
       return { month: m, score: calculatedScore };
     });
   }, [currentScore]);
 
-  // SVG Dimensions - Increased width to 600 to suit the wider 50% container
   const height = 120;
-  const width = 600; 
+  const width = 600;
   const padding = 15;
   const maxScore = 100;
 
-  const getX = (index) => padding + (index / (chartData.length - 1)) * (width - 2 * padding);
-  const getY = (score) => height - padding - (score / maxScore) * (height - 2 * padding);
+  const getX = (index) =>
+    padding + (index / (chartData.length - 1)) * (width - 2 * padding);
+  const getY = (score) =>
+    height - padding - (score / maxScore) * (height - 2 * padding);
 
-  const points = chartData.map((d, i) => `${getX(i)},${getY(d.score)}`).join(" ");
-  const areaPoints = `${getX(0)},${height - padding} ${points} ${getX(chartData.length - 1)},${height - padding}`;
+  const points = chartData
+    .map((d, i) => `${getX(i)},${getY(d.score)}`)
+    .join(" ");
+  const areaPoints = `${getX(0)},${height - padding} ${points} ${getX(
+    chartData.length - 1
+  )},${height - padding}`;
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden">
       <div className="relative w-full h-full">
-        <svg 
-            viewBox={`0 0 ${width} ${height}`} 
-            className="w-full h-full"
-            preserveAspectRatio="none"
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-full"
+          preserveAspectRatio="none"
         >
           <defs>
             <linearGradient id="pmScoreGradient" x1="0" y1="0" x2="0" y2="1">
@@ -109,63 +176,78 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
               <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
             </linearGradient>
           </defs>
-
-          {/* Grid Lines */}
-          <line x1={padding} y1={getY(0)} x2={width - padding} y2={getY(0)} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4" vectorEffect="non-scaling-stroke" />
-          <line x1={padding} y1={getY(50)} x2={width - padding} y2={getY(50)} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4" vectorEffect="non-scaling-stroke" />
-          <line x1={padding} y1={getY(100)} x2={width - padding} y2={getY(100)} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4" vectorEffect="non-scaling-stroke" />
-
-          {/* Area Fill */}
-          <polygon points={areaPoints} fill="url(#pmScoreGradient)" />
-
-          {/* Line */}
-          <polyline 
-            points={points} 
-            fill="none" 
-            stroke="#10b981" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            vectorEffect="non-scaling-stroke" 
+          <line
+            x1={padding}
+            y1={getY(0)}
+            x2={width - padding}
+            y2={getY(0)}
+            stroke="#e5e7eb"
+            strokeWidth="1"
+            strokeDasharray="4"
+            vectorEffect="non-scaling-stroke"
           />
-
-          {/* Data Points */}
+          <line
+            x1={padding}
+            y1={getY(50)}
+            x2={width - padding}
+            y2={getY(50)}
+            stroke="#e5e7eb"
+            strokeWidth="1"
+            strokeDasharray="4"
+            vectorEffect="non-scaling-stroke"
+          />
+          <line
+            x1={padding}
+            y1={getY(100)}
+            x2={width - padding}
+            y2={getY(100)}
+            stroke="#e5e7eb"
+            strokeWidth="1"
+            strokeDasharray="4"
+            vectorEffect="non-scaling-stroke"
+          />
+          <polygon points={areaPoints} fill="url(#pmScoreGradient)" />
+          <polyline
+            points={points}
+            fill="none"
+            stroke="#10b981"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
           {chartData.map((d, i) => (
             <g key={i}>
-                <circle
-                  cx={getX(i)}
-                  cy={getY(d.score)}
-                  r="3"
-                  fill="white"
-                  stroke="#10b981"
-                  strokeWidth="1.5"
-                  vectorEffect="non-scaling-stroke"
-                />
-                
-                {/* Score Value */}
-                <text
-                  x={getX(i)}
-                  y={getY(d.score) - 8}
-                  textAnchor="middle"
-                  fontSize="10" 
-                  fill="#10b981"
-                  fontWeight="bold"
-                >
-                  {d.score}
-                </text>
-
-                {/* Month Name */}
-                <text
-                  x={getX(i)}
-                  y={height - 2}
-                  textAnchor="middle"
-                  fontSize="9" 
-                  fill="#9ca3af"
-                  fontWeight="600"
-                  style={{ textTransform: 'uppercase' }}
-                >
-                  {d.month}
-                </text>
+              <circle
+                cx={getX(i)}
+                cy={getY(d.score)}
+                r="3"
+                fill="white"
+                stroke="#10b981"
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
+              />
+              <text
+                x={getX(i)}
+                y={getY(d.score) - 8}
+                textAnchor="middle"
+                fontSize="10"
+                fill="#10b981"
+                fontWeight="bold"
+              >
+                {d.score}
+              </text>
+              <text
+                x={getX(i)}
+                y={height - 2}
+                textAnchor="middle"
+                fontSize="9"
+                fill="#9ca3af"
+                fontWeight="600"
+                style={{ textTransform: "uppercase" }}
+              >
+                {d.month}
+              </text>
             </g>
           ))}
         </svg>
@@ -196,7 +278,6 @@ const CompactHistoryList = ({ alerts, loading }) => {
           key={alert.id}
           className="group bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all flex items-start gap-3"
         >
-          {/* Priority Dot */}
           <div
             className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${
               alert.priority === "CRITICAL"
@@ -207,9 +288,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
             }`}
             title={`Priority: ${alert.priority}`}
           />
-
           <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-            {/* Header: Equipment, Type, Date */}
             <div className="flex items-start justify-between">
               <div>
                 <h4 className="font-semibold text-xs text-gray-900">
@@ -235,13 +314,9 @@ const CompactHistoryList = ({ alerts, loading }) => {
                 })}
               </span>
             </div>
-
-            {/* Full Message */}
             <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded border border-gray-100 leading-relaxed">
               {alert.message}
             </div>
-
-            {/* Resolution Details (If Resolved) */}
             {alert.isResolved && (
               <div className="pt-2 mt-1 border-t border-gray-100 grid gap-1">
                 <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-medium">
@@ -446,6 +521,7 @@ export default function PolicyMakerDashboard() {
     setReviewComment("");
     setSelectedRequest(request);
   };
+  // Removed handleOpenCreateLab usage from UI but keeping function just in case logic needed later
   const handleOpenCreateLab = () => {
     setEditingLab(null);
     setIsLabModalOpen(true);
@@ -542,11 +618,9 @@ export default function PolicyMakerDashboard() {
       <div className="h-full grid grid-cols-12 gap-4">
         {/* LEFT SECTION - 8 Columns */}
         <div className="col-span-8 flex flex-col gap-4 h-full min-h-0">
-          
           {/* UPDATED GRID LAYOUT: 50% Stats, 50% Chart */}
           <div className="grid grid-cols-2 gap-3 flex-shrink-0 h-44">
-            
-            {/* General Stats - Now takes 50% width (col-span-1) */}
+            {/* General Stats */}
             <div className="col-span-1 grid grid-cols-2 grid-rows-2 gap-3 h-full">
               {standardStats.map((stat, index) => {
                 const Icon = stat.icon;
@@ -570,8 +644,8 @@ export default function PolicyMakerDashboard() {
                 );
               })}
             </div>
-            
-            {/* Health Score Chart - Now takes 50% width (col-span-1) */}
+
+            {/* Health Score Chart */}
             <div className="col-span-1 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col items-center justify-between p-3 relative overflow-hidden">
               <div className="w-full flex items-center justify-between z-10">
                 <h3 className="text-xs font-bold text-gray-700">
@@ -668,6 +742,7 @@ export default function PolicyMakerDashboard() {
                 </div>
               ) : viewMode === "cards" ? (
                 <div className="grid grid-cols-3 gap-4">
+                  {/* --- REMOVED CREATE NEW LAB CARD --- */}
                   {labsList.map((lab) => (
                     <div
                       key={lab.labId}
@@ -724,6 +799,7 @@ export default function PolicyMakerDashboard() {
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {/* --- REMOVED LIST VIEW HEADER BUTTON --- */}
                   {labsList.map((lab) => (
                     <div
                       key={lab.labId}
@@ -818,18 +894,20 @@ export default function PolicyMakerDashboard() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-0 min-h-0">
+            <div className="flex-1 overflow-y-auto min-h-0">
               {alertTab === "active" ? (
                 isActiveAlertsLoading ? (
                   <div className="flex justify-center py-6">
                     <LoadingSpinner />
                   </div>
                 ) : (
-                  <AlertsList
-                    alerts={activeAlerts}
-                    onResolve={handleResolveAlert}
-                    compact={true}
-                  />
+                  <div className="p-4">
+                    <AlertsList
+                      alerts={activeAlerts}
+                      onResolve={handleResolveAlert}
+                      compact={true}
+                    />
+                  </div>
                 )
               ) : (
                 <CompactHistoryList
@@ -939,8 +1017,11 @@ export default function PolicyMakerDashboard() {
         </div>
       </div>
 
+      {/* --- MODALS WRAPPED WITH PORTAL --- */}
+
+      {/* 1. Reorder Request Details Modal */}
       {selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <ModalWrapper onClose={() => setSelectedRequest(null)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-3">
@@ -1130,21 +1211,32 @@ export default function PolicyMakerDashboard() {
               )}
             </div>
           </div>
-        </div>
+        </ModalWrapper>
       )}
 
+      {/* 2. Lab Manager Form Modal */}
       {isLabModalOpen && (
-        <LabManagerForm
-          isOpen={isLabModalOpen}
-          onClose={handleLabModalClose}
-          labToEdit={editingLab}
-        />
+        <ModalWrapper onClose={handleLabModalClose}>
+          <div style={{ width: "100%" }}>
+            <LabManagerForm
+              isOpen={isLabModalOpen}
+              onClose={handleLabModalClose}
+              labToEdit={editingLab}
+            />
+          </div>
+        </ModalWrapper>
       )}
+
+      {/* 3. Institute Manager Form Modal */}
       {isInstituteModalOpen && (
-        <InstituteManagerForm
-          isOpen={isInstituteModalOpen}
-          onClose={handleInstituteModalClose}
-        />
+        <ModalWrapper onClose={handleInstituteModalClose}>
+          <div style={{ width: "100%" }}>
+            <InstituteManagerForm
+              isOpen={isInstituteModalOpen}
+              onClose={handleInstituteModalClose}
+            />
+          </div>
+        </ModalWrapper>
       )}
     </div>
   );

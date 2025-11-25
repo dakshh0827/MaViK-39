@@ -1,10 +1,11 @@
 /*
  * =====================================================
- * LabManagerDashboard.jsx - FINAL FIX
+ * LabManagerDashboard.jsx - FINAL UI POLISH
  * =====================================================
- * 1. Fixed 'shrink-0' warnings.
- * 2. Verified bracket matching for Modals.
- * 3. Includes ModalWrapper for translucent styling.
+ * 1. Replaced 'Analytics' text button with a simple Redirect Icon.
+ * 2. Placed at top-right of Equipment Table.
+ * 3. Redirects to /dashboard/lab-analytics/:labId
+ * 4. Only visible when a specific lab is selected.
  */
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
@@ -35,31 +36,53 @@ import {
   UserCheck,
   Check,
   X,
+  ExternalLink, // Changed to ExternalLink for the redirect icon
 } from "lucide-react";
 
-// --- NEW: Stylish Modal Wrapper (Glassmorphism) ---
-const ModalWrapper = ({ children, onClose, title, maxWidth = "max-w-lg" }) => {
+// --- CSS STYLE TO FORCE-FIX CHILD MODALS ---
+const modalStripperStyle = `
+  /* Target ALL fixed/absolute position elements inside modal-stripper */
+  .modal-stripper * {
+    position: static !important;
+  }
+  
+  /* Allow only the direct content card to have relative positioning */
+  .modal-stripper > *:last-child {
+    position: relative !important;
+  }
+  
+  /* Strip all background overlays and backdrops */
+  .modal-stripper div[class*="fixed"],
+  .modal-stripper div[class*="absolute"],
+  .modal-stripper div[class*="inset"],
+  .modal-stripper div[class*="bg-black"],
+  .modal-stripper div[class*="bg-gray-900"],
+  .modal-stripper div[class*="bg-slate"] {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+  }
+  
+  /* Ensure no pseudo-element overlays */
+  .modal-stripper::before,
+  .modal-stripper::after {
+    display: none !important;
+  }
+`;
+
+// --- UPDATED: Modal Wrapper ---
+const ModalWrapper = ({ children, onClose }) => {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-all animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-200"
       onClick={onClose}
     >
+      <style>{modalStripperStyle}</style>
+
       <div
-        className={`relative w-full ${maxWidth} bg-white rounded-2xl shadow-2xl ring-1 ring-black/5 transform transition-all animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]`}
+        className="modal-stripper relative w-auto max-w-4xl max-h-[90vh] overflow-y-auto p-4 flex flex-col items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
-        {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-            <h3 className="text-lg font-bold text-gray-800">{title}</h3>
-            <button
-              onClick={onClose}
-              className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        )}
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        {children}
       </div>
     </div>
   );
@@ -186,17 +209,23 @@ export default function LabManagerDashboard() {
   const [historyAlerts, setHistoryAlerts] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-  // Listeners
+  // --- REFS FOR TRIGGER TRACKING ---
+  const prevEqTrigger = useRef(triggerEquipmentModal || 0);
+  const prevBdTrigger = useRef(triggerBreakdownModal || 0);
+
+  // --- LISTENERS ---
   useEffect(() => {
-    if (triggerEquipmentModal > 0) {
+    if ((triggerEquipmentModal || 0) > prevEqTrigger.current) {
       setEditingEquipment(null);
       setIsModalOpen(true);
+      prevEqTrigger.current = triggerEquipmentModal;
     }
   }, [triggerEquipmentModal]);
 
   useEffect(() => {
-    if (triggerBreakdownModal > 0) {
+    if ((triggerBreakdownModal || 0) > prevBdTrigger.current) {
       setIsAddBreakdownModalOpen(true);
+      prevBdTrigger.current = triggerBreakdownModal;
     }
   }, [triggerBreakdownModal]);
 
@@ -592,6 +621,7 @@ export default function LabManagerDashboard() {
                   className="w-full pl-9 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
                 />
               </div>
+
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
@@ -612,6 +642,19 @@ export default function LabManagerDashboard() {
                 <Download className="w-4 h-4" />
               </button>
             </div>
+
+            {/* --- REDIRECT ICON BUTTON --- */}
+            {selectedLabId !== "all" && (
+              <button
+                onClick={() =>
+                  navigate(`/dashboard/lab-analytics/${selectedLabId}`)
+                }
+                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-gray-200 hover:border-blue-100 transition-colors shadow-sm"
+                title="Go to Lab Analytics"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-0">
@@ -678,7 +721,7 @@ export default function LabManagerDashboard() {
               </button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-0">
+          <div className="flex-1 overflow-y-auto p-4">
             {alertTab === "active" ? (
               isActiveAlertsLoading ? (
                 <div className="flex justify-center py-6">
@@ -701,12 +744,9 @@ export default function LabManagerDashboard() {
         </div>
       </div>
 
+      {/* MODALS - FIXED: Added inline style wrapper for Equipment Modal */}
       {breakdownAlertToRespond && (
-        <ModalWrapper
-          onClose={() => setBreakdownAlertToRespond(null)}
-          title="Respond to Alert"
-          maxWidth="max-w-xl"
-        >
+        <ModalWrapper onClose={() => setBreakdownAlertToRespond(null)}>
           <BreakdownAlertModal
             isOpen={!!breakdownAlertToRespond}
             onClose={() => setBreakdownAlertToRespond(null)}
@@ -724,11 +764,7 @@ export default function LabManagerDashboard() {
       )}
 
       {isAddBreakdownModalOpen && (
-        <ModalWrapper
-          onClose={() => setIsAddBreakdownModalOpen(false)}
-          title="Report Breakdown"
-          maxWidth="max-w-lg"
-        >
+        <ModalWrapper onClose={() => setIsAddBreakdownModalOpen(false)}>
           <AddBreakdownModal
             isOpen={isAddBreakdownModalOpen}
             onClose={() => setIsAddBreakdownModalOpen(false)}
@@ -740,20 +776,26 @@ export default function LabManagerDashboard() {
         </ModalWrapper>
       )}
 
+      {/* FIXED: Equipment Modal with inline style override */}
       {isModalOpen && (
-        <ModalWrapper
-          onClose={handleModalClose}
-          title={editingEquipment ? "Edit Equipment" : "Add Equipment"}
-          maxWidth="max-w-2xl"
-        >
-          <EquipmentFormModal
-            isOpen={isModalOpen}
-            onClose={handleModalClose}
-            onSubmit={
-              editingEquipment ? handleUpdateEquipment : handleCreateEquipment
-            }
-            equipment={editingEquipment}
-          />
+        <ModalWrapper onClose={handleModalClose}>
+          <div
+            style={{
+              position: "relative",
+              background: "transparent",
+              zIndex: "auto",
+              width: "100%",
+            }}
+          >
+            <EquipmentFormModal
+              isOpen={isModalOpen}
+              onClose={handleModalClose}
+              onSubmit={
+                editingEquipment ? handleUpdateEquipment : handleCreateEquipment
+              }
+              equipment={editingEquipment}
+            />
+          </div>
         </ModalWrapper>
       )}
     </div>

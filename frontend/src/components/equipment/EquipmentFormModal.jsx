@@ -2,9 +2,12 @@
  * =====================================================
  * 2. frontend/src/components/equipment/EquipmentFormModal.jsx
  * =====================================================
+ * FIXED: Removed createPortal and black overlay.
+ * Now renders as a pure card component to fit inside
+ * the LabManagerDashboard's glass wrapper.
  */
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
+// REMOVED: import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { useAuthStore } from "../../stores/authStore";
@@ -15,12 +18,18 @@ const DEPARTMENT_EQUIPMENT_NAMES = {
   FITTER_MANUFACTURING: [
     { value: "BENCH_DRILLING_MACHINE", label: "Bench Drilling Machine" },
     { value: "ANGLE_GRINDER_PORTABLE", label: "Angle Grinder (Portable)" },
-    { value: "MANUAL_ARC_WELDING_MACHINE", label: "Manual Arc Welding Machine" },
+    {
+      value: "MANUAL_ARC_WELDING_MACHINE",
+      label: "Manual Arc Welding Machine",
+    },
     { value: "GAS_WELDING_KIT", label: "Gas Welding Kit" },
     { value: "MIG_CO2_WELDING_MACHINE", label: "MIG/CO2 Welding Machine" },
   ],
   ELECTRICAL_ENGINEERING: [
-    { value: "ELECTRICIAN_TRAINING_PANEL", label: "Electrician Training Panel" },
+    {
+      value: "ELECTRICIAN_TRAINING_PANEL",
+      label: "Electrician Training Panel",
+    },
     {
       value: "ADVANCED_ELECTRICIAN_SETUP_PLC_VFD",
       label: "Advanced Electrician Setup (PLC/VFD)",
@@ -62,7 +71,10 @@ const DEPARTMENT_EQUIPMENT_NAMES = {
   ],
   SOLAR_INSTALLER_PV: [
     { value: "INVERTER_TRAINING_UNIT", label: "Inverter Training Unit" },
-    { value: "DRILLING_MACHINE_AND_TOOLS", label: "Drilling Machine and Tools" },
+    {
+      value: "DRILLING_MACHINE_AND_TOOLS",
+      label: "Drilling Machine and Tools",
+    },
   ],
   MATERIAL_TESTING_QUALITY: [
     { value: "TENSILE_TESTING_MACHINE", label: "Tensile Testing Machine" },
@@ -160,18 +172,6 @@ export default function EquipmentFormModal({
     imageUrl: "",
   });
 
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen]);
-
   // Handle ESC key to close modal
   useEffect(() => {
     const handleEscape = (e) => {
@@ -229,28 +229,19 @@ export default function EquipmentFormModal({
   }, [equipment, isOpen, isLabManager, userDepartment]);
 
   // Fetch available labs whenever the department changes
-  // The backend RBAC will automatically scope labs for Lab Managers
   useEffect(() => {
     if (formData.department) {
       fetchLabs(formData.department);
     } else {
-      setAvailableLabs([]); // Clear labs if no department is selected
+      setAvailableLabs([]);
     }
   }, [formData.department, userInstitute]);
 
   const fetchLabs = async (department) => {
     try {
-      // The backend route '/api/labs' is filtered by RBAC.
-      // Lab Managers will only get labs in their institute/dept.
-      // Policy Makers can filter by any institute/dept.
-      // We pass the relevant filters.
       const params = new URLSearchParams();
       if (isPolicyMaker) {
-        // Policy maker can add to any institute, but for simplicity
-        // let's assume they add to a predefined institute or we add an institute filter
-        // For now, let's filter by department only.
-        // In a real app, Policy Maker would select an institute first.
-        // Let's assume for now they operate on *all* institutes.
+        // Logic for policy maker
       } else if (isLabManager) {
         params.append("institute", userInstitute);
       }
@@ -271,7 +262,6 @@ export default function EquipmentFormModal({
       [name]: value,
     }));
 
-    // If department changes, reset equipmentName and labId
     if (name === "department") {
       setFormData((prev) => ({
         ...prev,
@@ -289,12 +279,11 @@ export default function EquipmentFormModal({
     setError("");
 
     try {
-      // Validate required fields
       const requiredFields = [
         "equipmentId",
         "name",
         "department",
-        "labId", // labId is now the public string ID
+        "labId",
         "manufacturer",
         "model",
         "purchaseDate",
@@ -306,7 +295,6 @@ export default function EquipmentFormModal({
         }
       }
 
-      // Parse specifications if provided
       let specifications = null;
       if (formData.specifications) {
         try {
@@ -316,11 +304,9 @@ export default function EquipmentFormModal({
         }
       }
 
-      // Prepare data for submission
       const submitData = {
         ...formData,
         specifications,
-        // Send null or undefined for optional fields if empty
         serialNumber: formData.serialNumber || undefined,
         warrantyExpiry: formData.warrantyExpiry || undefined,
         imageUrl: formData.imageUrl || undefined,
@@ -328,15 +314,13 @@ export default function EquipmentFormModal({
       };
 
       if (isEditing) {
-        // When updating, we don't send equipmentId in the body
         const { equipmentId, ...updateData } = submitData;
         await onSubmit(equipment.id, updateData);
       } else {
         await onSubmit(submitData);
       }
-      
-      onClose(); // Close modal on success
-      
+
+      onClose();
     } catch (err) {
       setError(err.message || "Failed to save equipment");
     } finally {
@@ -349,28 +333,29 @@ export default function EquipmentFormModal({
   const availableEquipmentNames =
     DEPARTMENT_EQUIPMENT_NAMES[formData.department] || [];
 
-  return createPortal(
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {isEditing ? "Edit Equipment" : "Add New Equipment"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            type="button"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+  // --- CHANGED HERE: Return pure card, no Portal, no Overlay ---
+  return (
+    <div
+      className="bg-white rounded-lg shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white z-10 rounded-t-lg">
+        <h2 className="text-xl font-semibold text-gray-900">
+          {isEditing ? "Edit Equipment" : "Add New Equipment"}
+        </h2>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+          type="button"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      {/* Form Content - Scrollable */}
+      <div className="overflow-y-auto p-6 space-y-4">
+        <form id="equipment-form" onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
@@ -387,7 +372,7 @@ export default function EquipmentFormModal({
               name="equipmentId"
               value={formData.equipmentId}
               onChange={handleChange}
-              disabled={isEditing} // Cannot change ID after creation
+              disabled={isEditing}
               placeholder="e.g., ITI-PUSA-MECH-01-CNC-001"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
               required
@@ -413,7 +398,7 @@ export default function EquipmentFormModal({
             />
           </div>
 
-          {/* Department - Selectable for Policy Maker, read-only for Lab Manager */}
+          {/* Department */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Department <span className="text-red-500">*</span>
@@ -423,8 +408,7 @@ export default function EquipmentFormModal({
                 name="department"
                 value={formData.department}
                 onChange={handleChange}
-                // Policy Maker can change department only when creating
-                disabled={isEditing} 
+                disabled={isEditing}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                 required
               >
@@ -438,7 +422,6 @@ export default function EquipmentFormModal({
                 )}
               </select>
             ) : (
-              // Lab Manager's department is fixed
               <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-700">
                 {DEPARTMENT_DISPLAY_NAMES[formData.department] ||
                   formData.department}
@@ -446,7 +429,7 @@ export default function EquipmentFormModal({
             )}
           </div>
 
-          {/* Equipment Type (Dynamic Dropdown) */}
+          {/* Equipment Type */}
           {availableEquipmentNames.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -468,14 +451,14 @@ export default function EquipmentFormModal({
             </div>
           )}
 
-          {/* Lab (Dynamic Dropdown) */}
+          {/* Lab */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Lab <span className="text-red-500">*</span>
             </label>
             <select
               name="labId"
-              value={formData.labId} // This is the public labId string
+              value={formData.labId}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
@@ -590,7 +573,7 @@ export default function EquipmentFormModal({
             />
           </div>
 
-          {/* Specifications (JSON) */}
+          {/* Specifications */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Specifications (JSON)
@@ -607,29 +590,30 @@ export default function EquipmentFormModal({
               Enter specifications in JSON format
             </p>
           </div>
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 sticky bottom-0 bg-white">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading}
-            >
-              {isLoading && <LoadingSpinner size="sm" />}
-              {isEditing ? "Update Equipment" : "Add Equipment"}
-            </button>
-          </div>
         </form>
       </div>
-    </div>,
-    document.body
+
+      {/* Footer Actions */}
+      <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-white rounded-b-lg">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          disabled={isLoading}
+        >
+          Cancel
+        </button>
+        {/* Trigger form submission from outside the form element */}
+        <button
+          type="submit"
+          form="equipment-form"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isLoading}
+        >
+          {isLoading && <LoadingSpinner size="sm" />}
+          {isEditing ? "Update Equipment" : "Add Equipment"}
+        </button>
+      </div>
+    </div>
   );
 }
