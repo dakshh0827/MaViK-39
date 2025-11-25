@@ -611,3 +611,15 @@ enum ReorderStatus {
   REJECTED
   CANCELLED
 }
+
+model SLDLayout {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  labId     String   @unique // One layout per lab
+  numColumns Int     @default(4) // Number of columns in the flowchart
+  positions  Json    // Store equipment positions: { equipmentId: { column, row } }
+  updatedBy  String  @db.ObjectId // User who last updated
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("sld_layouts")
+}

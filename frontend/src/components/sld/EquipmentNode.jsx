@@ -1,10 +1,13 @@
 /*
  * =====================================================
- * frontend/src/components/sld/EquipmentNodeComponent.jsx (UPDATED)
+ * frontend/src/components/sld/EquipmentNode.jsx (CLEAN)
  * =====================================================
+ * - Pure React component (no React Flow)
+ * - Minimal, clean design
+ * - Fixed size (140x100px)
+ * - Simple color indicators
  */
 import { useState, memo } from "react";
-import { Handle, Position } from 'reactflow';
 import { 
   Activity, 
   AlertTriangle, 
@@ -14,63 +17,72 @@ import {
   Wrench,
   Power,
   GraduationCap,
-  Info
+  ChevronDown,
+  X
 } from "lucide-react";
 
 const STATUS_CONFIG = {
   OPERATIONAL: {
-    color: "bg-green-500",
-    borderColor: "border-green-500",
-    textColor: "text-green-700",
+    color: "bg-emerald-500",
+    dotColor: "bg-emerald-400",
+    textColor: "text-emerald-700",
+    borderColor: "border-emerald-200",
     icon: CheckCircle,
     label: "Operational"
   },
   IN_USE: {
     color: "bg-blue-500",
-    borderColor: "border-blue-500",
+    dotColor: "bg-blue-400",
     textColor: "text-blue-700",
+    borderColor: "border-blue-200",
     icon: Activity,
     label: "In Use"
   },
   IN_CLASS: {
     color: "bg-purple-500",
-    borderColor: "border-purple-500",
+    dotColor: "bg-purple-400",
     textColor: "text-purple-700",
+    borderColor: "border-purple-200",
     icon: GraduationCap,
     label: "In Class"
   },
   IDLE: {
     color: "bg-gray-400",
-    borderColor: "border-gray-400",
-    textColor: "text-gray-700",
+    dotColor: "bg-gray-300",
+    textColor: "text-gray-600",
+    borderColor: "border-gray-200",
     icon: Clock,
     label: "Idle"
   },
   MAINTENANCE: {
-    color: "bg-yellow-500",
-    borderColor: "border-yellow-500",
-    textColor: "text-yellow-700",
+    color: "bg-amber-500",
+    dotColor: "bg-amber-400",
+    textColor: "text-amber-700",
+    borderColor: "border-amber-200",
     icon: Wrench,
     label: "Maintenance"
   },
   FAULTY: {
     color: "bg-red-500",
-    borderColor: "border-red-500",
+    dotColor: "bg-red-400",
     textColor: "text-red-700",
+    borderColor: "border-red-200",
     icon: XCircle,
     label: "Faulty"
   },
   OFFLINE: {
-    color: "bg-gray-600",
-    borderColor: "border-gray-600",
-    textColor: "text-gray-700",
+    color: "bg-slate-500",
+    dotColor: "bg-slate-400",
+    textColor: "text-slate-600",
+    borderColor: "border-slate-200",
     icon: Power,
     label: "Offline"
   },
   WARNING: {
     color: "bg-orange-500",
-    borderColor: "border-orange-500",
+    dotColor: "bg-orange-400",
     textColor: "text-orange-700",
+    borderColor: "border-orange-200",
     icon: AlertTriangle,
     label: "Warning"
   },
@@ -88,172 +100,170 @@ function EquipmentNodeComponent({ data }) {
   const unresolvedAlerts = equipment._count?.alerts || 0;
 
   const getHealthColor = (score) => {
-    if (score >= 80) return "text-green-600";
-    if (score >= 60) return "text-yellow-600";
+    if (score >= 80) return "text-emerald-600";
+    if (score >= 60) return "text-amber-600";
     if (score >= 40) return "text-orange-600";
     return "text-red-600";
   };
 
   return (
-    <>
-      {/* Connection handle at the top */}
-      <Handle 
-        type="target" 
-        position={Position.Top}
-        style={{ background: '#6B7280', width: 10, height: 10 }}
-      />
-      
-      <div className="relative group">
-        {/* Equipment Box */}
-        <div
-          className={`
-            relative w-[250px] p-4 rounded-lg border-4 
-            ${config.borderColor} bg-white shadow-lg 
-            hover:shadow-xl transition-all duration-300 cursor-pointer
-          `}
-          onClick={() => setShowDetails(!showDetails)}
-        >
-          {/* Status Indicator Badge */}
-          <div className={`absolute -top-3 -right-3 ${config.color} rounded-full p-2 shadow-lg z-10`}>
-            <StatusIcon className="w-5 h-5 text-white" />
-          </div>
-
-          {/* Alert Badge */}
-          {unresolvedAlerts > 0 && (
-            <div className="absolute -top-3 -left-3 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm shadow-lg z-10">
-              {unresolvedAlerts}
-            </div>
-          )}
-
-          {/* Equipment Info */}
-          <div className="space-y-2">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="font-bold text-gray-900 text-sm leading-tight line-clamp-2">
-                {equipment.name}
-              </h3>
-            </div>
-            
-            <p className="text-xs text-gray-600 font-mono">
+    <div className="relative">
+      {/* Minimal Equipment Card */}
+      <div
+        className={`
+          relative w-[140px] bg-white rounded-lg border-2 ${config.borderColor}
+          shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer
+          overflow-hidden
+        `}
+        onClick={() => setShowDetails(!showDetails)}
+      >
+        {/* Status Bar */}
+        <div className={`h-1 ${config.color}`}></div>
+        
+        {/* Content */}
+        <div className="p-3 space-y-2">
+          {/* Equipment Name */}
+          <div>
+            <h3 className="font-semibold text-gray-900 text-xs leading-tight line-clamp-2">
+              {equipment.name}
+            </h3>
+            <p className="text-[10px] text-gray-500 font-mono mt-0.5 truncate">
               {equipment.equipmentId}
             </p>
-
-            <div className="pt-2 border-t border-gray-200">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-xs text-gray-600">Status:</span>
-                <span className={`text-xs font-semibold ${config.textColor}`}>
-                  {config.label}
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-600">Health:</span>
-                <span className={`text-xs font-bold ${getHealthColor(healthScore)}`}>
-                  {healthScore.toFixed(0)}%
-                </span>
-              </div>
-            </div>
           </div>
 
-          {/* Hover indicator */}
-          <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Info className="w-4 h-4 text-gray-400" />
+          {/* Metrics */}
+          <div className="space-y-1.5">
+            {/* Status */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className={`w-2 h-2 rounded-full ${config.dotColor}`}></div>
+                <span className="text-[10px] text-gray-600">{config.label}</span>
+              </div>
+            </div>
+            
+            {/* Health Score */}
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-600">Health</span>
+              <span className={`text-xs font-bold ${getHealthColor(healthScore)}`}>
+                {healthScore.toFixed(0)}%
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Detailed Popup */}
-        {showDetails && (
+        {/* Alert Badge */}
+        {unresolvedAlerts > 0 && (
+          <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow">
+            {unresolvedAlerts}
+          </div>
+        )}
+
+        {/* Expand Indicator */}
+        <div className="absolute bottom-1 right-1">
+          <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+
+      {/* Details Popup */}
+      {showDetails && (
+        <>
+          {/* Backdrop */}
           <div 
-            className="absolute z-[1000] top-full left-1/2 transform -translate-x-1/2 mt-4 w-80 bg-white rounded-lg shadow-2xl border-2 border-gray-300 p-4"
+            className="fixed inset-0 z-40"
+            onClick={() => setShowDetails(false)}
+          />
+          
+          {/* Popup */}
+          <div 
+            className="absolute z-50 top-full left-1/2 transform -translate-x-1/2 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-4"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close button */}
             <button
               onClick={() => setShowDetails(false)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-xl leading-none"
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
 
             <div className="space-y-3">
               <div>
-                <h4 className="font-bold text-lg text-gray-900">{equipment.name}</h4>
-                <p className="text-sm text-gray-600">{equipment.equipmentId}</p>
+                <h4 className="font-bold text-base text-gray-900">{equipment.name}</h4>
+                <p className="text-xs text-gray-500 font-mono">{equipment.equipmentId}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <p className="text-gray-600">Manufacturer:</p>
-                  <p className="font-semibold">{equipment.manufacturer}</p>
+                  <p className="text-gray-500">Manufacturer</p>
+                  <p className="font-medium text-gray-900">{equipment.manufacturer}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Model:</p>
-                  <p className="font-semibold">{equipment.model}</p>
+                  <p className="text-gray-500">Model</p>
+                  <p className="font-medium text-gray-900">{equipment.model}</p>
                 </div>
               </div>
 
               {equipment.serialNumber && (
-                <div className="text-sm">
-                  <p className="text-gray-600">Serial Number:</p>
-                  <p className="font-semibold font-mono">{equipment.serialNumber}</p>
+                <div className="text-xs">
+                  <p className="text-gray-500">Serial Number</p>
+                  <p className="font-medium font-mono text-gray-900">{equipment.serialNumber}</p>
                 </div>
               )}
 
-              <div className="pt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Status:</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon className={`w-4 h-4 ${config.textColor}`} />
-                    <span className={`font-semibold ${config.textColor}`}>
+              <div className="pt-2 border-t border-gray-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-600">Status</span>
+                  <div className="flex items-center gap-1.5">
+                    <StatusIcon className={`w-3.5 h-3.5 ${config.textColor}`} />
+                    <span className={`text-xs font-semibold ${config.textColor}`}>
                       {config.label}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Health Score:</span>
-                  <span className={`font-bold ${getHealthColor(healthScore)}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-600">Health Score</span>
+                  <span className={`text-sm font-bold ${getHealthColor(healthScore)}`}>
                     {healthScore.toFixed(1)}%
                   </span>
                 </div>
 
                 {equipment.status?.temperature && (
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Temperature:</span>
-                    <span className="font-semibold">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-600">Temperature</span>
+                    <span className="text-xs font-medium text-gray-900">
                       {equipment.status.temperature.toFixed(1)}°C
                     </span>
                   </div>
                 )}
 
                 {equipment.status?.isOperatingInClass && (
-                  <div className="flex items-center gap-2 bg-purple-50 p-2 rounded">
-                    <GraduationCap className="w-4 h-4 text-purple-600" />
-                    <span className="text-sm text-purple-700 font-medium">
-                      Currently in class
-                    </span>
+                  <div className="flex items-center gap-2 bg-purple-50 p-2 rounded text-xs">
+                    <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
+                    <span className="text-purple-700 font-medium">In class session</span>
                   </div>
                 )}
 
                 {unresolvedAlerts > 0 && (
-                  <div className="flex items-center gap-2 bg-red-50 p-2 rounded">
-                    <AlertTriangle className="w-4 h-4 text-red-600" />
-                    <span className="text-sm text-red-700 font-medium">
-                      {unresolvedAlerts} unresolved alert{unresolvedAlerts > 1 ? 's' : ''}
+                  <div className="flex items-center gap-2 bg-red-50 p-2 rounded text-xs">
+                    <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                    <span className="text-red-700 font-medium">
+                      {unresolvedAlerts} alert{unresolvedAlerts > 1 ? 's' : ''}
                     </span>
                   </div>
                 )}
               </div>
 
               {equipment.status?.lastUsedAt && (
-                <div className="text-xs text-gray-500 pt-2 border-t border-gray-200">
+                <div className="text-[10px] text-gray-500 pt-2 border-t border-gray-100">
                   Last used: {new Date(equipment.status.lastUsedAt).toLocaleString()}
                 </div>
               )}
             </div>
           </div>
-        )}
-      </div>
-    </>
+        </>
+      )}
+    </div>
   );
 }
 

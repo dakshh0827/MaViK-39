@@ -17,6 +17,7 @@ import maintenanceRoutes from "./maintenance.routes.js";
 import reportRoutes from "./report.routes.js";
 import chatbotRoutes from "./chatbot.routes.js";
 import breakdownRoutes from "./breakdown.routes.js";
+import sldRoutes from "./sld.routes.js";
 
 const router = express.Router();
 
@@ -57,5 +58,6 @@ router.use("/maintenance", maintenanceRoutes);
 router.use("/reports", reportRoutes);
 router.use("/chatbot", chatbotRoutes);
 router.use("/breakdown", breakdownRoutes);
+router.use("/sld-layouts", sldRoutes);
 
 export default router;

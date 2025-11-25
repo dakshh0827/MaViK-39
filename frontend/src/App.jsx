@@ -1,8 +1,3 @@
-/*
- * =====================================================
- * frontend/src/App.jsx (FIXED - Prevent Multiple checkAuth)
- * =====================================================
- */
 import React, { useEffect, useRef } from "react";
 import {
   BrowserRouter as Router,
@@ -28,6 +23,7 @@ import SLDPage from "./pages/SLDPage";
 import ReportGenerationPage from "./pages/ReportGenerationPage";
 import LabAnalyticsPage from "./pages/dashboards/LabAnalyticsPage";
 import ReorderRequestsPage from "./pages/dashboards/ReorderRequestsPage";
+import UserGuidePage from "./pages/UserGuidePage";
 
 // Layout
 import DashboardLayout from "./components/layout/DashboardLayout";
@@ -81,6 +77,7 @@ function App() {
           <Route path="/chatbot" element={<ChatbotPage />} />
           <Route path="/help" element={<HelpSupportPage />} />
           <Route path="/sld" element={<SLDPage />} />
+          <Route path="/user-guide" element={<UserGuidePage />} />
           <Route
             path="/dashboard/lab-analytics/:labId"
             element={<LabAnalyticsPage />}
