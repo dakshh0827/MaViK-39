@@ -1,22 +1,21 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Book,
-  Mail,
-  Phone,
-  FileText,
-  Video,
-  LifeBuoy,
-  MessageSquare,
-  ChevronDown,
-  ChevronUp,
-  HelpCircle,
-  Activity,
-  Wrench,
-  Smartphone,
-  Info,
-  ExternalLink
-} from "lucide-react";
+  FaBook,
+  FaEnvelope,
+  FaPhone,
+  FaQuestionCircle,
+  FaChartLine,
+  FaWrench,
+  FaMobileAlt,
+  FaInfoCircle,
+  FaExternalLinkAlt,
+  FaChevronDown,
+  FaChevronUp,
+  FaCommentAlt,
+  FaFileAlt,
+  FaYoutube
+} from "react-icons/fa";
 import { useAuthStore } from "../stores/authStore";
 
 export default function HelpSupportPage() {
@@ -86,59 +85,22 @@ export default function HelpSupportPage() {
   const supportSections = [
     {
       title: "Frequently Asked Questions (FAQ)",
-      icon: HelpCircle,
+      icon: FaQuestionCircle,
       content: getFAQs()
     },
     {
       title: "Maintenance & Alert Support",
-      icon: Wrench,
+      icon: FaWrench,
       content: getMaintenanceSupport()
     },
-    // {
-    //   title: "Troubleshooting Wizard",
-    //   icon: LifeBuoy,
-    //   content: (
-    //     <div className="space-y-2">
-    //       <p className="font-medium text-blue-900 text-sm">Choose your issue:</p>
-    //       <button className="block w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded text-sm text-gray-700 border border-gray-200 transition-colors">
-    //         My machine won't start
-    //       </button>
-    //       <button className="block w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded text-sm text-gray-700 border border-gray-200 transition-colors">
-    //         Dashboard shows incorrect utilization
-    //       </button>
-    //       <button className="block w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded text-sm text-gray-700 border border-gray-200 transition-colors">
-    //         Sensor data offline
-    //       </button>
-    //     </div>
-    //   )
-    // },
     {
       title: "How to Use App Features",
-      icon: Smartphone,
+      icon: FaMobileAlt,
       content: getAppFeatures()
     },
-    // {
-    //   title: "Documentation & Video Tutorials",
-    //   icon: Video,
-    //   content: (
-    //     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-    //       <a href="#" className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline p-2 rounded hover:bg-blue-50 transition-colors">
-    //         <Video size={16}/> How to check analytics
-    //       </a>
-    //       <a href="#" className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline p-2 rounded hover:bg-blue-50 transition-colors">
-    //         <FileText size={16}/> User Manual (PDF)
-    //       </a>
-    //       {isManagerOrAbove && (
-    //         <a href="#" className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline p-2 rounded hover:bg-blue-50 transition-colors">
-    //           <Video size={16}/> Maintenance logging guide
-    //         </a>
-    //       )}
-    //     </div>
-    //   )
-    // },
     {
       title: "System Status",
-      icon: Activity,
+      icon: FaChartLine,
       content: (
         <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-2 text-emerald-800 font-medium text-sm">
@@ -154,7 +116,7 @@ export default function HelpSupportPage() {
     },
     {
       title: "Feedback & Suggestions",
-      icon: MessageSquare,
+      icon: FaCommentAlt,
       content: (
         <form className="space-y-3">
           <div className="space-y-1">
@@ -170,6 +132,25 @@ export default function HelpSupportPage() {
           </button>
         </form>
       )
+    },
+    {
+      title: "Custom Request",
+      icon: FaFileAlt,
+      content: (
+        <form className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-500">Describe what you want</label>
+            <textarea 
+              className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all" 
+              placeholder="Enter your custom requirement or specific request here..." 
+              rows="3"
+            ></textarea>
+          </div>
+          <button className="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900 transition-colors shadow-sm">
+            Send Request
+          </button>
+        </form>
+      )
     }
   ];
 
@@ -178,32 +159,54 @@ export default function HelpSupportPage() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-200 pb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Help Center</h1>
-          {/* <p className="text-gray-500 mt-1">
-            Welcome, {user?.firstName || 'User'}. Support resources customized for your role.
-          </p> */}
         </div>
       </div>
 
-      {/* Unified User Guide Access (Visible ONLY to Trainers) */}
+      {/* Trainer Specific Resources (User Guide & Videos) */}
       {isTrainer && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-shadow hover:shadow-md">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
-              <Book className="w-8 h-8" />
+        <div className="space-y-4">
+          
+          {/* User Guide Card */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-shadow hover:shadow-md">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
+                <FaBook className="w-8 h-8" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Equipment User Guides</h2>
+                <p className="text-gray-500 text-sm mt-1 max-w-xl">
+                  Access standard operating procedures, safety checklists, and 4-step visual guides for all laboratory equipment.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Equipment User Guides</h2>
-              <p className="text-gray-500 text-sm mt-1 max-w-xl">
-                Access standard operating procedures, safety checklists, and 4-step visual guides for all laboratory equipment.
-              </p>
-            </div>
+            <Link 
+              to="/user-guide" 
+              className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-medium py-2.5 px-5 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm whitespace-nowrap"
+            >
+              Open Guide <FaExternalLinkAlt size={16} />
+            </Link>
           </div>
-          <Link 
-            to="/user-guide" 
-            className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-medium py-2.5 px-5 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm whitespace-nowrap"
-          >
-            Open Guide <ExternalLink size={16} />
-          </Link>
+
+          {/* Video Resources Card (Replaces Inline List) */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-shadow hover:shadow-md">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-red-50 rounded-lg text-red-600">
+                <FaYoutube className="w-8 h-8" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Video Training Resources</h2>
+                <p className="text-gray-500 text-sm mt-1 max-w-xl">
+                  Watch detailed video tutorials on carpentry, welding, electrical tools, and engineering drawing.
+                </p>
+              </div>
+            </div>
+            <Link 
+              to="/video-resources" 
+              className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-medium py-2.5 px-5 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm whitespace-nowrap"
+            >
+              View Videos <FaExternalLinkAlt size={16} />
+            </Link>
+          </div>
         </div>
       )}
 
@@ -212,42 +215,58 @@ export default function HelpSupportPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-4 bg-gray-50/50 border-b border-gray-200">
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Info className="w-5 h-5 text-blue-600" />
+              <FaInfoCircle className="w-5 h-5 text-blue-600" />
               Support Resources
             </h2>
           </div>
           
           <div className="divide-y divide-gray-100">
-            {supportSections.map((section, index) => (
-              <div key={index} className="bg-white">
-                <button
-                  onClick={() => toggleSection(index)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors text-left focus:outline-none group"
+            {supportSections.map((section, index) => {
+              const isOpen = openSection === index;
+              return (
+                <div 
+                  key={index} 
+                  className={`transition-all duration-300 ${
+                    isOpen 
+                      ? 'bg-gray-50 border-l-4 border-l-blue-500' // Highlighting logic
+                      : 'bg-white border-l-4 border-l-transparent hover:bg-gray-50/50'
+                  }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-1.5 rounded-md transition-colors ${openSection === index ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-500 group-hover:bg-white group-hover:text-blue-500'}`}>
-                      <section.icon className="w-5 h-5" />
+                  <button
+                    onClick={() => toggleSection(index)}
+                    className="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-1.5 rounded-md transition-colors ${
+                        isOpen 
+                          ? 'bg-blue-100 text-blue-600' 
+                          : 'bg-gray-50 text-gray-500 group-hover:bg-white group-hover:text-blue-500'
+                      }`}>
+                        <section.icon className="w-5 h-5" />
+                      </div>
+                      <span className={`font-medium transition-colors ${
+                        isOpen ? 'text-blue-800' : 'text-gray-700'
+                      }`}>
+                        {section.title}
+                      </span>
                     </div>
-                    <span className={`font-medium transition-colors ${openSection === index ? 'text-blue-700' : 'text-gray-700'}`}>
-                      {section.title}
-                    </span>
-                  </div>
-                  {openSection === index ? (
-                    <ChevronUp className="w-4 h-4 text-blue-500" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    {isOpen ? (
+                      <FaChevronUp className="w-4 h-4 text-blue-500" />
+                    ) : (
+                      <FaChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    )}
+                  </button>
+                  
+                  {isOpen && (
+                    <div className="px-6 pb-6 pt-2 pl-[3.75rem] animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="prose prose-sm max-w-none">
+                        {section.content}
+                      </div>
+                    </div>
                   )}
-                </button>
-                
-                {openSection === index && (
-                  <div className="px-6 pb-6 pt-2 pl-[3.75rem] animate-in fade-in slide-in-from-top-1 duration-200">
-                    <div className="prose prose-sm max-w-none">
-                      {section.content}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -256,7 +275,7 @@ export default function HelpSupportPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex items-start gap-4 hover:border-blue-200 transition-colors">
           <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-            <Mail className="w-5 h-5" />
+            <FaEnvelope className="w-5 h-5" />
           </div>
           <div>
             <h3 className="font-medium text-gray-900 text-sm">Email Support</h3>
@@ -269,7 +288,7 @@ export default function HelpSupportPage() {
         
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex items-start gap-4 hover:border-green-200 transition-colors">
           <div className="p-2 bg-green-50 rounded-lg text-green-600">
-            <Phone className="w-5 h-5" />
+            <FaPhone className="w-5 h-5" />
           </div>
           <div>
             <h3 className="font-medium text-gray-900 text-sm">Helpline</h3>

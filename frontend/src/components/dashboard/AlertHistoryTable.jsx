@@ -1,29 +1,29 @@
 import React from "react";
 import {
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  HelpCircle,
-  Calendar,
-  User,
-} from "lucide-react";
+  FaExclamationTriangle,
+  FaCheckCircle,
+  FaClock,
+  FaQuestionCircle,
+  FaCalendarAlt,
+  FaUser,
+} from "react-icons/fa";
 
 const SEVERITY_CONFIG = {
   CRITICAL: {
     color: "bg-red-100 text-red-800",
-    icon: AlertTriangle,
+    icon: FaExclamationTriangle,
   },
   HIGH: {
     color: "bg-orange-100 text-orange-800",
-    icon: AlertTriangle,
+    icon: FaExclamationTriangle,
   },
   MEDIUM: {
     color: "bg-yellow-100 text-yellow-800",
-    icon: Clock,
+    icon: FaClock,
   },
   LOW: {
     color: "bg-blue-100 text-blue-800",
-    icon: HelpCircle,
+    icon: FaQuestionCircle,
   },
 };
 
@@ -37,7 +37,7 @@ export default function AlertHistoryTable({ alerts, loading }) {
   if (!alerts || alerts.length === 0) {
     return (
       <div className="p-8 text-center flex flex-col items-center justify-center text-gray-500">
-        <CheckCircle className="w-12 h-12 text-green-100 mb-3" />
+        <FaCheckCircle className="w-12 h-12 text-green-100 mb-3" />
         <p>No resolved alerts found in history.</p>
       </div>
     );
@@ -102,19 +102,19 @@ export default function AlertHistoryTable({ alerts, loading }) {
                 </td>
                 <td className="px-6 py-4 text-gray-600">
                   <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3 h-3" />
+                    <FaCalendarAlt className="w-3 h-3" />
                     {formatDate(alert.createdAt)}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-gray-600">
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle className="w-3 h-3 text-green-600" />
+                    <FaCheckCircle className="w-3 h-3 text-green-600" />
                     {formatDate(alert.resolvedAt)}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-gray-600">
                   <div className="flex items-center gap-1.5">
-                    <User className="w-3 h-3" />
+                    <FaUser className="w-3 h-3" />
                     {alert.resolvedBy || "System"}
                   </div>
                 </td>

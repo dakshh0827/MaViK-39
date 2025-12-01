@@ -4,7 +4,7 @@
  * =====================================================
  */
 import { useState } from "react";
-import { X, Package } from "lucide-react";
+import { FaTimes, FaBox } from "react-icons/fa";
 
 export default function ReorderModal({ isOpen, onClose, breakdown, onSubmit }) {
   const [formData, setFormData] = useState({
@@ -47,13 +47,13 @@ export default function ReorderModal({ isOpen, onClose, breakdown, onSubmit }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <Package className="w-6 h-6 text-blue-600" />
+              <FaBox className="w-6 h-6 text-blue-600" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
@@ -68,7 +68,7 @@ export default function ReorderModal({ isOpen, onClose, breakdown, onSubmit }) {
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            <X className="w-6 h-6" />
+            <FaTimes className="w-6 h-6" />
           </button>
         </div>
 

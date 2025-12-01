@@ -1,19 +1,15 @@
-// =====================================================
-// 15. src/pages/LandingPage.jsx
-// =====================================================
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
-  Activity,
-  Shield,
-  BarChart,
-  Bell,
-  CheckCircle,
-  Award,
-  ChevronRight,
-  FileText,
-} from "lucide-react";
+  FaChartLine,
+  FaShieldAlt,
+  FaChartBar,
+  FaBell,
+  FaCheckCircle,
+  FaAward,
+  FaChevronRight,
+  FaFileAlt
+} from "react-icons/fa";
 
 export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -29,25 +25,25 @@ export default function LandingPage() {
 
   const features = [
     {
-      icon: Activity,
+      icon: FaChartLine,
       title: "Real-time Monitoring",
       description:
         "Track equipment status, health, and performance in real-time across all labs.",
     },
     {
-      icon: Shield,
+      icon: FaShieldAlt,
       title: "Predictive Maintenance",
       description:
         "AI-powered alerts prevent breakdowns before they happen, reducing downtime.",
     },
     {
-      icon: BarChart,
+      icon: FaChartBar,
       title: "Usage Analytics",
       description:
         "Comprehensive insights on equipment utilization and efficiency metrics.",
     },
     {
-      icon: Bell,
+      icon: FaBell,
       title: "Instant Alerts",
       description:
         "Get notified of faults, malfunctions, or unsafe usage patterns immediately.",
@@ -93,7 +89,7 @@ export default function LandingPage() {
           {/* Left: Logo & Name */}
           <div className="flex items-center gap-0">
             <div className="p-1.5 bg-[#002f96] rounded-full shadow-[0_0_15px_rgba(21,93,252,0.5)] shrink-0 z-10">
-              <Activity className="w-5 h-5 text-white" />
+              <FaChartLine className="w-5 h-5 text-white" />
             </div>
             {/* App Name: Collapses on scroll */}
             <h1
@@ -154,7 +150,7 @@ export default function LandingPage() {
           <section className="container mx-auto px-6 pb-20 pt-10 text-center">
             <div className="max-w-4xl mx-auto">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#002f96]/10 text-[#002f96] text-xs font-bold mb-8 border border-[#002f96]/20 uppercase tracking-wider">
-                <Award className="w-3.5 h-3.5" />
+                <FaAward className="w-3.5 h-3.5" />
                 <span>Ministry of Skill Development</span>
               </div>
 
@@ -176,7 +172,7 @@ export default function LandingPage() {
                   to="/signup"
                   className="w-full sm:w-auto px-8 py-4 bg-[#002f96] text-white text-lg font-semibold rounded-xl hover:bg-blue-700 hover:scale-105 transition-all shadow-[0_10px_20px_rgba(21,93,252,0.3)] flex items-center justify-center gap-2"
                 >
-                  Become a Member <ChevronRight className="w-5 h-5" />
+                  Become a Member <FaChevronRight className="w-5 h-5" />
                 </Link>
                 <Link
                   to="/login"
@@ -235,7 +231,7 @@ export default function LandingPage() {
                       className="flex items-start gap-4 p-4 rounded-2xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5"
                     >
                       <div className="p-1 bg-[#002f96]/20 rounded-full mt-0.5">
-                        <CheckCircle className="w-5 h-5 text-[#002f96] flex-shrink-0" />
+                        <FaCheckCircle className="w-5 h-5 text-[#002f96] flex-shrink-0" />
                       </div>
                       <span className="text-lg text-gray-500 font-medium">
                         {benefit}
@@ -254,7 +250,7 @@ export default function LandingPage() {
             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-[#002f96] rounded-lg">
-                  <Activity className="w-5 h-5 text-white" />
+                  <FaChartLine className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-xl font-bold text-gray-900">
                   IoT Monitor
@@ -284,7 +280,7 @@ export default function LandingPage() {
                   to="/terms"
                   className="flex items-center gap-1 hover:text-[#002f96] transition-colors"
                 >
-                  <FileText className="w-4 h-4" />
+                  <FaFileAlt className="w-4 h-4" />
                   Terms & Conditions
                 </Link>
               </div>

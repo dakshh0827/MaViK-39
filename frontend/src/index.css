@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+/* @font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat-Thin.otf") format("otf");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat-ExtraBold.otf") format("otf");
+  font-weight: 900;
+} */
+
+@theme {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}

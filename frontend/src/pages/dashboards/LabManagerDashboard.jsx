@@ -1,12 +1,3 @@
-/*
- * =====================================================
- * LabManagerDashboard.jsx - FINAL UI POLISH
- * =====================================================
- * 1. Replaced 'Analytics' text button with a simple Redirect Icon.
- * 2. Placed at top-right of Equipment Table.
- * 3. Redirects to /dashboard/lab-analytics/:labId
- * 4. Only visible when a specific lab is selected.
- */
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useDashboardStore } from "../../stores/dashboardStore";
@@ -23,21 +14,22 @@ import BreakdownEquipmentTable from "../../components/breakdown/BreakdownEquipme
 import AddBreakdownModal from "../../components/breakdown/AddBreakdownModal";
 import BreakdownAlertModal from "../../components/breakdown/BreakdownAlertModal";
 import {
-  Activity,
-  AlertTriangle,
-  Wrench,
-  TrendingUp,
-  Building,
-  Download,
-  Search,
-  CheckCircle,
-  ChevronDown,
-  Clock,
-  UserCheck,
-  Check,
-  X,
-  ExternalLink, // Changed to ExternalLink for the redirect icon
-} from "lucide-react";
+  FaChartLine,
+  FaExclamationTriangle,
+  FaWrench,
+  FaArrowUp,
+  FaBuilding,
+  FaDownload,
+  FaSearch,
+  FaCheckCircle,
+  FaChevronDown,
+  FaClock,
+  FaUserCheck,
+  FaCheck,
+  FaTimes,
+  FaExternalLinkAlt
+} from "react-icons/fa";
+import { ImLab } from "react-icons/im";
 
 // --- CSS STYLE TO FORCE-FIX CHILD MODALS ---
 const modalStripperStyle = `
@@ -127,7 +119,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
                 </h4>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[10px] text-gray-500 flex items-center gap-1">
-                    <Building className="w-3 h-3" />{" "}
+                    <ImLab className="w-3 h-3" />{" "}
                     {alert.lab?.name || "Unknown Lab"}
                   </span>
                   <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
@@ -136,7 +128,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
                 </div>
               </div>
               <span className="text-[10px] text-gray-400 whitespace-nowrap flex items-center gap-1">
-                <Clock className="w-3 h-3" />
+                <FaClock className="w-3 h-3" />
                 {new Date(
                   alert.resolvedAt || alert.createdAt
                 ).toLocaleDateString("en-US", {
@@ -151,7 +143,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
             {alert.isResolved && (
               <div className="pt-2 mt-1 border-t border-gray-100 grid gap-1">
                 <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-medium">
-                  <UserCheck className="w-3 h-3" />
+                  <FaUserCheck className="w-3 h-3" />
                   Resolved by {alert.resolver?.name || "Admin"}
                 </div>
               </div>
@@ -444,28 +436,28 @@ export default function LabManagerDashboard() {
 
   const stats = [
     {
-      icon: Activity,
+      icon: FaChartLine,
       title: "Total Equipment",
       value: overview?.overview?.totalEquipment || 0,
       color: "text-blue-600",
       bg: "bg-blue-50",
     },
     {
-      icon: TrendingUp,
+      icon: FaArrowUp,
       title: "Active Equipment",
       value: overview?.overview?.activeEquipment || 0,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
     },
     {
-      icon: AlertTriangle,
+      icon: FaExclamationTriangle,
       title: "Unresolved Alerts",
       value: overview?.overview?.unresolvedAlerts || 0,
       color: "text-red-600",
       bg: "bg-red-50",
     },
     {
-      icon: Wrench,
+      icon: FaWrench,
       title: "Maintenance Due",
       value: overview?.overview?.maintenanceDue || 0,
       color: "text-orange-600",
@@ -499,7 +491,7 @@ export default function LabManagerDashboard() {
                     {stat.value}
                   </div>
                 </div>
-                <div className="mt-1 w-full text-center text-xs font-semibold text-gray-500 uppercase tracking-wide truncate">
+                <div className="mt-1 w-full text-center text-wrap text-xs font-semibold text-gray-500 uppercase tracking-wide truncate">
                   {stat.title}
                 </div>
               </div>
@@ -511,7 +503,7 @@ export default function LabManagerDashboard() {
           <div className="flex-shrink-0 px-3 py-2 border-b border-gray-100 bg-white flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">
-                <Wrench className="w-4 h-4" />
+                <FaWrench className="w-4 h-4" />
               </div>
               <h2 className="text-sm font-bold text-gray-800">Breakdowns</h2>
             </div>
@@ -530,7 +522,7 @@ export default function LabManagerDashboard() {
             <div className="p-2 min-w-0 w-full">
               {breakdownEquipment.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400 py-8">
-                  <CheckCircle className="w-8 h-8 mb-2 opacity-20" />
+                  <FaCheckCircle className="w-8 h-8 mb-2 opacity-20" />
                   <p className="text-xs">No breakdowns reported.</p>
                 </div>
               ) : (
@@ -561,12 +553,12 @@ export default function LabManagerDashboard() {
                 className="flex items-center gap-3 p-1.5 hover:bg-gray-50 rounded-lg transition-colors group pr-3 border border-transparent hover:border-gray-200"
               >
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                  <Building className="w-4 h-4" />
+                  <ImLab className="w-4 h-4" />
                 </div>
                 <div className="text-left">
                   <h2 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
                     {currentLabName}
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                    <FaChevronDown className="w-3.5 h-3.5 text-gray-400" />
                   </h2>
                   <p className="text-[10px] text-gray-500 font-medium">
                     {filteredEquipment.length} Equipment Listed
@@ -582,7 +574,7 @@ export default function LabManagerDashboard() {
                   >
                     <span>All Labs</span>
                     {selectedLabId === "all" && (
-                      <Check className="w-3.5 h-3.5 text-blue-600" />
+                      <FaCheck className="w-3.5 h-3.5 text-blue-600" />
                     )}
                   </button>
                   <div className="h-px bg-gray-100 my-1" />
@@ -602,7 +594,7 @@ export default function LabManagerDashboard() {
                         {lab.name}
                       </span>
                       {selectedLabId === lab.labId && (
-                        <Check className="w-3.5 h-3.5 text-blue-600" />
+                        <FaCheck className="w-3.5 h-3.5 text-blue-600" />
                       )}
                     </button>
                   ))}
@@ -612,7 +604,7 @@ export default function LabManagerDashboard() {
 
             <div className="flex items-center gap-3 flex-1 justify-end">
               <div className="relative max-w-[240px] w-full">
-                <Search className="absolute left-3 top-2 w-3.5 h-3.5 text-gray-400" />
+                <FaSearch className="absolute left-3 top-2 w-3.5 h-3.5 text-gray-400" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -639,7 +631,7 @@ export default function LabManagerDashboard() {
                 className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-gray-200 hover:border-blue-100 transition-colors shadow-sm"
                 title="Export CSV"
               >
-                <Download className="w-4 h-4" />
+                <FaDownload className="w-4 h-4" />
               </button>
             </div>
 
@@ -652,7 +644,7 @@ export default function LabManagerDashboard() {
                 className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-gray-200 hover:border-blue-100 transition-colors shadow-sm"
                 title="Go to Lab Analytics"
               >
-                <ExternalLink className="w-4 h-4" />
+                <FaExternalLinkAlt className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -691,7 +683,7 @@ export default function LabManagerDashboard() {
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-100 bg-white flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="relative p-1.5 bg-yellow-50 text-yellow-600 rounded-lg">
-                <AlertTriangle className="w-4 h-4" />
+                <FaExclamationTriangle className="w-4 h-4" />
                 {activeAlerts.length > 0 && (
                   <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-white" />
                 )}

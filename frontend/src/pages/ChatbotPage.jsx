@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useChatbotStore } from "../stores/chatbotStore";
-import { Send, Bot, User as UserIcon } from "lucide-react";
+import { FaPaperPlane, FaRobot, FaUser } from "react-icons/fa";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 
 export default function ChatbotPage() {
@@ -49,9 +49,6 @@ export default function ChatbotPage() {
     <div className="h-[calc(100vh-12rem)] flex flex-col">
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-4">
         <h1 className="text-2xl font-bold text-gray-900">AI Assistant</h1>
-        {/* <p className="text-gray-600 mt-1">
-          Ask me anything about equipment status, alerts, or analytics
-        </p> */}
       </div>
 
       {/* Chat Messages */}
@@ -59,7 +56,7 @@ export default function ChatbotPage() {
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
-              <Bot className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <FaRobot className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">
                 Start a conversation with the AI assistant
               </p>
@@ -87,7 +84,7 @@ export default function ChatbotPage() {
                     {msg.message}
                   </div>
                   <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <UserIcon className="w-4 h-4 text-blue-900" />
+                    <FaUser className="w-4 h-4 text-blue-900" />
                   </div>
                 </div>
 
@@ -95,7 +92,7 @@ export default function ChatbotPage() {
                 {msg.response && (
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-4 h-4 text-gray-600" />
+                      <FaRobot className="w-4 h-4 text-gray-600" />
                     </div>
                     <div className="bg-gray-100 rounded-lg px-4 py-2 max-w-[70%]">
                       {msg.response}
@@ -108,7 +105,7 @@ export default function ChatbotPage() {
             {isLoading && (
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-gray-600" />
+                  <FaRobot className="w-4 h-4 text-gray-600" />
                 </div>
                 <div className="bg-gray-100 rounded-lg px-4 py-2">
                   <LoadingSpinner size="sm" />
@@ -139,7 +136,7 @@ export default function ChatbotPage() {
             disabled={!input.trim() || isLoading}
             className="px-6 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
-            <Send className="w-4 h-4" />
+            <FaPaperPlane className="w-4 h-4" />
             Send
           </button>
         </div>

@@ -3,16 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { useBreakdownStore } from "../../stores/breakdownStore";
 import ReorderRequestsList from "../../components/breakdown/ReorderRequestsList";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+// Updated imports to react-icons/fa
 import {
-  Package,
-  ArrowLeft,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Filter,
-  Search,
-  Calendar,
-} from "lucide-react";
+  FaBox,
+  FaArrowLeft,
+  FaClock,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaSearch,
+  FaCalendarAlt,
+} from "react-icons/fa";
 
 export default function ReorderRequestsPage() {
   const navigate = useNavigate();
@@ -80,11 +80,11 @@ export default function ReorderRequestsPage() {
                 onClick={() => navigate(-1)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
+                <FaArrowLeft className="w-5 h-5 text-gray-600" />
               </button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <Package className="w-6 h-6 text-blue-600" />
+                  <FaBox className="w-6 h-6 text-blue-600" />
                   Reorder Requests
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">
@@ -104,7 +104,7 @@ export default function ReorderRequestsPage() {
                     {stats.total}
                   </p>
                 </div>
-                <Package className="w-8 h-8 text-blue-600" />
+                <FaBox className="w-8 h-8 text-blue-600" />
               </div>
             </div>
 
@@ -116,7 +116,7 @@ export default function ReorderRequestsPage() {
                     {stats.pending}
                   </p>
                 </div>
-                <Clock className="w-8 h-8 text-yellow-600" />
+                <FaClock className="w-8 h-8 text-yellow-600" />
               </div>
             </div>
 
@@ -128,7 +128,7 @@ export default function ReorderRequestsPage() {
                     {stats.approved}
                   </p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-green-600" />
+                <FaCheckCircle className="w-8 h-8 text-green-600" />
               </div>
             </div>
 
@@ -140,7 +140,7 @@ export default function ReorderRequestsPage() {
                     {stats.rejected}
                   </p>
                 </div>
-                <XCircle className="w-8 h-8 text-red-600" />
+                <FaTimesCircle className="w-8 h-8 text-red-600" />
               </div>
             </div>
           </div>
@@ -148,7 +148,7 @@ export default function ReorderRequestsPage() {
           {/* Filters */}
           <div className="flex items-center gap-3">
             <div className="flex-1 relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <FaSearch className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search by equipment or lab name..."
@@ -188,7 +188,7 @@ export default function ReorderRequestsPage() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         {filteredRequests.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <FaBox className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
               No Requests Found
             </h3>
@@ -253,7 +253,7 @@ export default function ReorderRequestsPage() {
                       <div>
                         <p className="text-gray-600">Request Date</p>
                         <p className="font-medium text-gray-900 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
+                          <FaCalendarAlt className="w-3 h-3" />
                           {new Date(request.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -299,7 +299,7 @@ export default function ReorderRequestsPage() {
                       }}
                       className="px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
                     >
-                      <XCircle className="w-4 h-4 inline mr-1" />
+                      <FaTimesCircle className="w-4 h-4 inline mr-1" />
                       Reject
                     </button>
                     <button
@@ -318,7 +318,7 @@ export default function ReorderRequestsPage() {
                       }}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
                     >
-                      <CheckCircle className="w-4 h-4 inline mr-1" />
+                      <FaCheckCircle className="w-4 h-4 inline mr-1" />
                       Approve
                     </button>
                   </div>

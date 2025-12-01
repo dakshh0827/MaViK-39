@@ -1,14 +1,10 @@
 /*
  * =====================================================
- * 2. frontend/src/components/equipment/EquipmentFormModal.jsx
+ * frontend/src/components/equipment/EquipmentFormModal.jsx
  * =====================================================
- * FIXED: Removed createPortal and black overlay.
- * Now renders as a pure card component to fit inside
- * the LabManagerDashboard's glass wrapper.
  */
 import { useState, useEffect } from "react";
-// REMOVED: import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { FaTimes } from "react-icons/fa";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { useAuthStore } from "../../stores/authStore";
 import api from "../../lib/axios";
@@ -333,7 +329,7 @@ export default function EquipmentFormModal({
   const availableEquipmentNames =
     DEPARTMENT_EQUIPMENT_NAMES[formData.department] || [];
 
-  // --- CHANGED HERE: Return pure card, no Portal, no Overlay ---
+  // --- Renders as a pure card component ---
   return (
     <div
       className="bg-white rounded-lg shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]"
@@ -349,7 +345,7 @@ export default function EquipmentFormModal({
           className="text-gray-400 hover:text-gray-600 transition-colors"
           type="button"
         >
-          <X className="w-6 h-6" />
+          <FaTimes className="w-6 h-6" />
         </button>
       </div>
 

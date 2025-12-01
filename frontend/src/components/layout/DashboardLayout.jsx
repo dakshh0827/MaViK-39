@@ -1,23 +1,19 @@
-// =====================================================
-// 10. src/components/layout/DashboardLayout.jsx
-// =====================================================
-
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import {
-  Menu,
-  Home,
-  FileText,
-  MessageSquare,
-  HelpCircle,
-  GitBranch,
-  User,
-  LogOut,
-  Plus,
-  School,
-  Building,
-  MonitorPlay,
-  AlertTriangle, // Added for Breakdown icon
-} from "lucide-react";
+  FaBars,
+  FaHome,
+  FaFileAlt,
+  FaCommentDots,
+  FaQuestionCircle,
+  FaCodeBranch,
+  FaUser,
+  FaSignOutAlt,
+  FaPlus,
+  FaUniversity,
+  FaBuilding,
+  FaDesktop,
+  FaExclamationTriangle
+} from "react-icons/fa";
 import { useState, useEffect, useRef } from "react";
 import { useAuthStore } from "../../stores/authStore";
 
@@ -68,12 +64,12 @@ export default function DashboardLayout() {
   };
 
   const navItems = [
-    { icon: Home, label: "Dashboard", path: "/dashboard" },
-    { icon: GitBranch, label: "SLD View", path: "/sld" },
-    { icon: FileText, label: "Reports", path: "/reports" },
-    { icon: MessageSquare, label: "Chatbot", path: "/chatbot" },
-    { icon: HelpCircle, label: "Help & Support", path: "/help" },
-    { icon: User, label: "Profile", path: "/profile" },
+    { icon: FaHome, label: "Dashboard", path: "/dashboard" },
+    { icon: FaCodeBranch, label: "SLD View", path: "/sld" },
+    { icon: FaFileAlt, label: "Reports", path: "/reports" },
+    { icon: FaCommentDots, label: "Chatbot", path: "/chatbot" },
+    { icon: FaQuestionCircle, label: "Help & Support", path: "/help" },
+    { icon: FaUser, label: "Profile", path: "/profile" },
   ];
 
   const sidebarWidth = isSidebarCollapsed ? "5rem" : "16rem";
@@ -92,7 +88,7 @@ export default function DashboardLayout() {
             className="w-full flex items-center gap-3 p-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors text-left"
           >
             <div className="p-1.5 bg-blue-100 text-blue-800 rounded-md">
-              <School size={18} />
+              <FaUniversity size={18} />
             </div>
             <span>Manage Institutes</span>
           </button>
@@ -104,7 +100,7 @@ export default function DashboardLayout() {
             className="w-full flex items-center gap-3 p-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors text-left"
           >
             <div className="p-1.5 bg-blue-100 text-blue-800 rounded-md">
-              <Building size={18} />
+              <FaBuilding size={18} />
             </div>
             <span>Add New Lab</span>
           </button>
@@ -123,7 +119,7 @@ export default function DashboardLayout() {
             className="w-full flex items-center gap-3 p-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors text-left"
           >
             <div className="p-1.5 bg-blue-100 text-blue-800 rounded-md">
-              <MonitorPlay size={18} />
+              <FaDesktop size={18} />
             </div>
             <span>Add Equipment</span>
           </button>
@@ -136,7 +132,7 @@ export default function DashboardLayout() {
             className="w-full flex items-center gap-3 p-3 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-900 rounded-lg transition-colors text-left"
           >
             <div className="p-1.5 bg-red-100 text-red-800 rounded-md">
-              <AlertTriangle size={18} />
+              <FaExclamationTriangle size={18} />
             </div>
             <span>Report Breakdown</span>
           </button>
@@ -163,7 +159,7 @@ export default function DashboardLayout() {
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
           >
-            <Menu size={22} />
+            <FaBars size={22} />
           </button>
         </div>
 
@@ -251,7 +247,7 @@ export default function DashboardLayout() {
                   isQuickMenuOpen ? "rotate-45" : ""
                 }`}
               >
-                <Plus size={20} />
+                <FaPlus size={20} />
               </div>
               {!isSidebarCollapsed && (
                 <span className="font-medium">Quick Add</span>
@@ -270,8 +266,8 @@ export default function DashboardLayout() {
           transition: "left 0.3s ease",
         }}
       >
-        <h1 className="text-lg font-bold text-blue-900">
-          IoT Equipment Monitor
+        <h1 className="text-2xl font-bold text-blue-600">
+          MaViK-39
         </h1>
 
         <div className="flex items-center gap-4">
@@ -285,7 +281,7 @@ export default function DashboardLayout() {
             onClick={handleLogout}
             className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
           >
-            <LogOut size={20} />
+            <FaSignOutAlt size={20} />
           </button>
         </div>
       </header>

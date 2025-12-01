@@ -9,17 +9,17 @@
  */
 import { useState, memo } from "react";
 import { 
-  Activity, 
-  AlertTriangle, 
-  CheckCircle, 
-  XCircle,
-  Clock,
-  Wrench,
-  Power,
-  GraduationCap,
-  ChevronDown,
-  X
-} from "lucide-react";
+  FaChartLine, 
+  FaExclamationTriangle, 
+  FaCheckCircle, 
+  FaTimesCircle,
+  FaClock,
+  FaWrench,
+  FaPowerOff,
+  FaGraduationCap,
+  FaChevronDown,
+  FaTimes
+} from "react-icons/fa";
 
 const STATUS_CONFIG = {
   OPERATIONAL: {
@@ -27,7 +27,7 @@ const STATUS_CONFIG = {
     dotColor: "bg-emerald-400",
     textColor: "text-emerald-700",
     borderColor: "border-emerald-200",
-    icon: CheckCircle,
+    icon: FaCheckCircle,
     label: "Operational"
   },
   IN_USE: {
@@ -35,7 +35,7 @@ const STATUS_CONFIG = {
     dotColor: "bg-blue-400",
     textColor: "text-blue-700",
     borderColor: "border-blue-200",
-    icon: Activity,
+    icon: FaChartLine,
     label: "In Use"
   },
   IN_CLASS: {
@@ -43,7 +43,7 @@ const STATUS_CONFIG = {
     dotColor: "bg-purple-400",
     textColor: "text-purple-700",
     borderColor: "border-purple-200",
-    icon: GraduationCap,
+    icon: FaGraduationCap,
     label: "In Class"
   },
   IDLE: {
@@ -51,7 +51,7 @@ const STATUS_CONFIG = {
     dotColor: "bg-gray-300",
     textColor: "text-gray-600",
     borderColor: "border-gray-200",
-    icon: Clock,
+    icon: FaClock,
     label: "Idle"
   },
   MAINTENANCE: {
@@ -59,7 +59,7 @@ const STATUS_CONFIG = {
     dotColor: "bg-amber-400",
     textColor: "text-amber-700",
     borderColor: "border-amber-200",
-    icon: Wrench,
+    icon: FaWrench,
     label: "Maintenance"
   },
   FAULTY: {
@@ -67,7 +67,7 @@ const STATUS_CONFIG = {
     dotColor: "bg-red-400",
     textColor: "text-red-700",
     borderColor: "border-red-200",
-    icon: XCircle,
+    icon: FaTimesCircle,
     label: "Faulty"
   },
   OFFLINE: {
@@ -75,7 +75,7 @@ const STATUS_CONFIG = {
     dotColor: "bg-slate-400",
     textColor: "text-slate-600",
     borderColor: "border-slate-200",
-    icon: Power,
+    icon: FaPowerOff,
     label: "Offline"
   },
   WARNING: {
@@ -83,7 +83,7 @@ const STATUS_CONFIG = {
     dotColor: "bg-orange-400",
     textColor: "text-orange-700",
     borderColor: "border-orange-200",
-    icon: AlertTriangle,
+    icon: FaExclamationTriangle,
     label: "Warning"
   },
 };
@@ -161,7 +161,7 @@ function EquipmentNodeComponent({ data }) {
 
         {/* Expand Indicator */}
         <div className="absolute bottom-1 right-1">
-          <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
+          <FaChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
@@ -183,7 +183,7 @@ function EquipmentNodeComponent({ data }) {
               onClick={() => setShowDetails(false)}
               className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
             >
-              <X className="w-4 h-4" />
+              <FaTimes className="w-4 h-4" />
             </button>
 
             <div className="space-y-3">
@@ -239,14 +239,14 @@ function EquipmentNodeComponent({ data }) {
 
                 {equipment.status?.isOperatingInClass && (
                   <div className="flex items-center gap-2 bg-purple-50 p-2 rounded text-xs">
-                    <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
+                    <FaGraduationCap className="w-3.5 h-3.5 text-purple-600" />
                     <span className="text-purple-700 font-medium">In class session</span>
                   </div>
                 )}
 
                 {unresolvedAlerts > 0 && (
                   <div className="flex items-center gap-2 bg-red-50 p-2 rounded text-xs">
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                    <FaExclamationTriangle className="w-3.5 h-3.5 text-red-600" />
                     <span className="text-red-700 font-medium">
                       {unresolvedAlerts} alert{unresolvedAlerts > 1 ? 's' : ''}
                     </span>

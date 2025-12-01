@@ -1,11 +1,7 @@
 /*
  * =====================================================
- * frontend/src/pages/SLDPage.jsx (COMPLETE FIX)
+ * frontend/src/pages/SLDPage.jsx
  * =====================================================
- * - Fixed equipment position persistence
- * - Fixed column reduction reorganization
- * - Fixed position picker state updates
- * - Added proper error handling
  */
 import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "../stores/authStore";
@@ -16,16 +12,17 @@ import { useSLDLayoutStore } from "../stores/sldLayoutStore";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import EquipmentNodeComponent from "../components/sld/EquipmentNode";
 import { 
-  Filter, 
-  AlertCircle, 
-  Edit3, 
-  Save, 
-  X, 
-  Plus, 
-  Minus,
-  GripVertical,
-  Columns
-} from "lucide-react";
+  FaFilter, 
+  FaExclamationCircle, 
+  FaEdit, 
+  FaSave, 
+  FaTimes, 
+  FaPlus, 
+  FaMinus,
+  FaGripVertical,
+  FaColumns,
+  FaMicroscope
+} from "react-icons/fa";
 
 const DEPARTMENT_DISPLAY_NAMES = {
   FITTER_MANUFACTURING: "Fitter/Manufacturing",
@@ -62,47 +59,106 @@ export default function SLDPage() {
   const { institutes, fetchInstitutes, isLoading: institutesLoading } = useInstituteStore();
   const { fetchLayout, updateLayout, isLoading: layoutLoading } = useSLDLayoutStore();
 
-  // Filter states
   const [selectedInstitute, setSelectedInstitute] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [selectedLab, setSelectedLab] = useState("all");
   
-  // Layout configuration
-  const [numColumns, setNumColumns] = useState(4);
+  const [numColumns, setNumColumns] = useState(3);
   const [isEditMode, setIsEditMode] = useState(false);
   const [equipmentPositions, setEquipmentPositions] = useState({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // =========================================================
+  // 1. INITIALIZATION LOGIC
+  // =========================================================
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        if (user.role === "POLICY_MAKER") {
-          await fetchInstitutes();
+    const initializePage = async () => {
+      // CASE A: TRAINER (Direct Access via User Context)
+      if (user.role === "TRAINER") {
+        // We use the labId directly from the user object, just like the Dashboard
+        const trainerLabId = user.lab?.labId; 
+        
+        if (trainerLabId) {
+          setSelectedLab(trainerLabId);
+        } else {
+          console.warn("Trainer has no lab assigned in user context.");
         }
-        await fetchLabs();
-      } catch (error) {
-        console.error("Failed to load data:", error);
+      } 
+      // CASE B: ADMIN/MANAGER (Needs Lists to Select)
+      else {
+        try {
+          if (user.role === "POLICY_MAKER") {
+            await fetchInstitutes();
+          }
+          await fetchLabs();
+        } catch (error) {
+          console.error("Failed to load filter data:", error);
+        }
       }
     };
-    loadData();
-  }, []);
 
-  // Filter logic based on user role
-  const availableInstitutes = useMemo(() => {
-    if (user.role === "POLICY_MAKER") {
-      return institutes;
-    } else if (user.role === "LAB_MANAGER") {
-      return institutes.filter(inst => inst.instituteId === user.instituteId);
+    initializePage();
+  }, [user]);
+
+  // =========================================================
+  // 2. DATA FETCHING (Triggered when selectedLab changes)
+  // =========================================================
+  useEffect(() => {
+    // Only fetch if a specific lab is selected (ID is not "all")
+    if (selectedLab && selectedLab !== "all") {
+      // Fetch Equipment for this lab
+      fetchEquipment({ labId: selectedLab });
+      // Fetch Layout for this lab
+      loadSavedLayout(selectedLab);
     }
+  }, [selectedLab]);
+
+  // Helper to load layout
+  const loadSavedLayout = async (labId) => {
+    try {
+      const layout = await fetchLayout(labId);
+      if (layout && layout.positions && Object.keys(layout.positions).length > 0) {
+        setEquipmentPositions(layout.positions);
+        setNumColumns(layout.numColumns || 4);
+      } else {
+        // Reset to default if no layout exists
+        setEquipmentPositions({}); 
+      }
+    } catch (error) {
+      console.error("Failed to load layout:", error);
+      setEquipmentPositions({});
+    }
+  };
+
+  // Re-calculate default positions if equipment loads and no positions are set
+  useEffect(() => {
+    if (equipment.length > 0 && Object.keys(equipmentPositions).length === 0) {
+      initializeDefaultPositions();
+    }
+  }, [equipment, equipmentPositions]);
+
+  // =========================================================
+  // 3. COMPUTED VALUES (For Filters & Display)
+  // =========================================================
+
+  // Name of the lab being viewed (for Header)
+  const currentLabName = useMemo(() => {
+    if (user.role === "TRAINER") return user.lab?.name || "Assigned Lab";
+    
+    const labObj = labs.find(l => l.labId === selectedLab);
+    return labObj ? labObj.name : "";
+  }, [user, labs, selectedLab]);
+
+  // Filter Logic (Only for Non-Trainers)
+  const availableInstitutes = useMemo(() => {
+    if (user.role === "POLICY_MAKER") return institutes;
+    if (user.role === "LAB_MANAGER") return institutes.filter(inst => inst.instituteId === user.instituteId);
     return [];
   }, [institutes, user]);
 
   const availableDepartments = useMemo(() => {
-    if (user.role === "LAB_MANAGER") {
-      return [user.department];
-    }
-    
+    if (user.role === "LAB_MANAGER") return [user.department];
     let filteredLabs = labs;
     if (selectedInstitute !== "all") {
       filteredLabs = labs.filter(lab => lab.instituteId === selectedInstitute);
@@ -112,60 +168,21 @@ export default function SLDPage() {
 
   const availableLabs = useMemo(() => {
     let filteredLabs = labs;
-
     if (user.role === "LAB_MANAGER") {
       filteredLabs = labs.filter(
         lab => lab.instituteId === user.instituteId && lab.department === user.department
       );
     } else {
-      if (selectedInstitute !== "all") {
-        filteredLabs = filteredLabs.filter(lab => lab.instituteId === selectedInstitute);
-      }
-      if (selectedDepartment !== "all") {
-        filteredLabs = filteredLabs.filter(lab => lab.department === selectedDepartment);
-      }
+      if (selectedInstitute !== "all") filteredLabs = filteredLabs.filter(lab => lab.instituteId === selectedInstitute);
+      if (selectedDepartment !== "all") filteredLabs = filteredLabs.filter(lab => lab.department === selectedDepartment);
     }
-
     return filteredLabs;
   }, [labs, selectedInstitute, selectedDepartment, user]);
 
-  const selectedLabData = useMemo(() => {
-    if (selectedLab === "all") return null;
-    return availableLabs.find(lab => lab.labId === selectedLab);
-  }, [selectedLab, availableLabs]);
 
-  // Fetch equipment when lab changes
-  useEffect(() => {
-    if (selectedLab !== "all") {
-      fetchEquipment({ labId: selectedLab });
-    }
-  }, [selectedLab]);
-
-  // Load saved layout when lab changes or equipment loads
-  useEffect(() => {
-    if (selectedLab !== "all" && equipment.length > 0) {
-      loadSavedLayout();
-    }
-  }, [selectedLab, equipment.length]);
-
-  const loadSavedLayout = async () => {
-    try {
-      const layout = await fetchLayout(selectedLab);
-      
-      if (layout && layout.positions && Object.keys(layout.positions).length > 0) {
-        setEquipmentPositions(layout.positions);
-        setNumColumns(layout.numColumns || 4);
-      } else {
-        // Initialize default positions for equipment
-        initializeDefaultPositions();
-      }
-    } catch (error) {
-      console.error("Failed to load layout:", error);
-      // Initialize default positions on error
-      initializeDefaultPositions();
-    }
-  };
-
+  // =========================================================
+  // 4. LAYOUT & INTERACTION LOGIC
+  // =========================================================
   const initializeDefaultPositions = () => {
     const defaultPositions = {};
     const cols = numColumns;
@@ -211,17 +228,15 @@ export default function SLDPage() {
     setIsEditMode(!isEditMode);
   };
 
-  // FIX: Reorganize equipment when reducing columns
   const adjustColumns = (delta) => {
     const newCols = Math.max(1, Math.min(8, numColumns + delta));
     setNumColumns(newCols);
     setHasUnsavedChanges(true);
     
-    // Reorganize ALL equipment to fit in new column structure
+    // Recalculate positions based on new column count to keep order
     const updatedPositions = {};
     const equipmentIds = Object.keys(equipmentPositions);
     
-    // Sort equipment by their current position (top to bottom, left to right)
     const sortedEquipment = equipmentIds.sort((a, b) => {
       const posA = equipmentPositions[a];
       const posB = equipmentPositions[b];
@@ -229,7 +244,6 @@ export default function SLDPage() {
       return posA.column - posB.column;
     });
     
-    // Reorganize equipment in the new column structure
     sortedEquipment.forEach((eqId, index) => {
       const col = index % newCols;
       const row = Math.floor(index / newCols);
@@ -251,13 +265,11 @@ export default function SLDPage() {
     }
   };
 
-  // Generate layout with columns
   const generateLayout = () => {
-    if (!selectedLabData || equipment.length === 0) {
+    if (selectedLab === "all" || equipment.length === 0) {
       return { nodes: [], connections: [], totalWidth: 0, totalHeight: 0 };
     }
 
-    // Ensure all equipment has positions
     const positions = { ...equipmentPositions };
     equipment.forEach((eq, index) => {
       if (!positions[eq.id]) {
@@ -267,16 +279,13 @@ export default function SLDPage() {
       }
     });
 
-    // Calculate grid dimensions
     const maxRow = Math.max(...Object.values(positions).map(p => p.row), 0);
     const totalWidth = numColumns * COLUMN_WIDTH;
     const totalHeight = (maxRow + 1) * ROW_HEIGHT;
 
-    // Position root node at top center
     const rootX = (totalWidth - 280) / 2;
     const rootY = 0;
 
-    // Position equipment nodes
     const nodes = equipment.map(eq => {
       const pos = positions[eq.id] || { column: 0, row: 0 };
       const x = pos.column * COLUMN_WIDTH + (COLUMN_WIDTH - NODE_WIDTH) / 2;
@@ -291,12 +300,11 @@ export default function SLDPage() {
       };
     });
 
-    // Generate connections from root to each node
     const connections = nodes.map(node => {
-      const startX = rootX + 140; // Root center
-      const startY = rootY + 100; // Root bottom
-      const endX = node.x + NODE_WIDTH / 2; // Node center
-      const endY = node.y; // Node top
+      const startX = rootX + 140; 
+      const startY = rootY + 100; 
+      const endX = node.x + NODE_WIDTH / 2; 
+      const endY = node.y; 
 
       return {
         startX,
@@ -321,6 +329,7 @@ export default function SLDPage() {
 
   const layout = generateLayout();
 
+  // Handlers for Managers/Policy Makers
   const handleInstituteChange = (e) => {
     setSelectedInstitute(e.target.value);
     setSelectedDepartment("all");
@@ -334,9 +343,7 @@ export default function SLDPage() {
 
   const handleLabChange = (e) => {
     if (isEditMode && hasUnsavedChanges) {
-      if (!window.confirm("You have unsaved changes. Are you sure you want to switch labs?")) {
-        return;
-      }
+      if (!window.confirm("You have unsaved changes. Are you sure you want to switch labs?")) return;
     }
     setSelectedLab(e.target.value);
     setIsEditMode(false);
@@ -348,18 +355,22 @@ export default function SLDPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* HEADER SECTION */}
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             Single Line Diagram (SLD)
           </h1>
-          {/* <p className="text-gray-600 mt-1">
-            Flowchart representation of equipment layout and connections
-          </p> */}
+          {/* TRAINER VIEW: Static Lab Name */}
+          {user.role === "TRAINER" && (
+             <p className="text-gray-500 mt-1 flex items-center gap-2 animate-fadeIn">
+               <FaMicroscope className="text-blue-500" />
+               Viewing: <span className="font-semibold text-gray-700">{currentLabName}</span>
+             </p>
+          )}
         </div>
         
-        {/* Edit Controls (Only for Lab Manager) */}
+        {/* ACTION BUTTONS (Only for Managers) */}
         {canEdit && selectedLab !== "all" && equipment.length > 0 && (
           <div className="flex gap-2">
             {isEditMode ? (
@@ -369,7 +380,7 @@ export default function SLDPage() {
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
                   disabled={!hasUnsavedChanges || isSaving}
                 >
-                  <Save className="w-4 h-4" />
+                  <FaSave className="w-4 h-4" />
                   {isSaving ? "Saving..." : "Save Layout"}
                 </button>
                 <button
@@ -377,7 +388,7 @@ export default function SLDPage() {
                   className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
                   disabled={isSaving}
                 >
-                  <X className="w-4 h-4" />
+                  <FaTimes className="w-4 h-4" />
                   Exit Edit
                 </button>
               </>
@@ -386,7 +397,7 @@ export default function SLDPage() {
                 onClick={toggleEditMode}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
               >
-                <Edit3 className="w-4 h-4" />
+                <FaEdit className="w-4 h-4" />
                 Edit Layout
               </button>
             )}
@@ -394,70 +405,69 @@ export default function SLDPage() {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-5 h-5 text-gray-600" />
-          <h3 className="font-semibold text-gray-900">Select Lab</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Institute Filter (Only for Policy Maker) */}
-          {user.role === "POLICY_MAKER" && (
+      {/* FILTER SECTION - COMPLETELY HIDDEN FOR TRAINERS */}
+      {user.role !== "TRAINER" && (
+        <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+          <div className="flex items-center gap-2 mb-4">
+            <FaFilter className="w-5 h-5 text-gray-600" />
+            <h3 className="font-semibold text-gray-900">Select Lab</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {user.role === "POLICY_MAKER" && (
+              <select
+                value={selectedInstitute}
+                onChange={handleInstituteChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isLoading}
+              >
+                <option value="all">All Institutes</option>
+                {availableInstitutes.map((inst) => (
+                  <option key={inst.id} value={inst.instituteId}>
+                    {inst.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {user.role === "POLICY_MAKER" && (
+              <select
+                value={selectedDepartment}
+                onChange={handleDepartmentChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isLoading || availableDepartments.length === 0}
+              >
+                <option value="all">All Departments</option>
+                {availableDepartments.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {DEPARTMENT_DISPLAY_NAMES[dept] || dept}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <select
-              value={selectedInstitute}
-              onChange={handleInstituteChange}
+              value={selectedLab}
+              onChange={handleLabChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isLoading}
+              disabled={isLoading || availableLabs.length === 0}
             >
-              <option value="all">All Institutes</option>
-              {availableInstitutes.map((inst) => (
-                <option key={inst.id} value={inst.instituteId}>
-                  {inst.name}
+              <option value="all">Select a Lab</option>
+              {availableLabs.map((lab) => (
+                <option key={lab.labId} value={lab.labId}>
+                  {lab.name} ({lab.labId})
                 </option>
               ))}
             </select>
-          )}
-
-          {/* Department Filter (Only for Policy Maker) */}
-          {user.role === "POLICY_MAKER" && (
-            <select
-              value={selectedDepartment}
-              onChange={handleDepartmentChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isLoading || availableDepartments.length === 0}
-            >
-              <option value="all">All Departments</option>
-              {availableDepartments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {DEPARTMENT_DISPLAY_NAMES[dept] || dept}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Lab Filter */}
-          <select
-            value={selectedLab}
-            onChange={handleLabChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            disabled={isLoading || availableLabs.length === 0}
-          >
-            <option value="all">Select a Lab</option>
-            {availableLabs.map((lab) => (
-              <option key={lab.labId} value={lab.labId}>
-                {lab.name} ({lab.labId})
-              </option>
-            ))}
-          </select>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Column Configuration (Only in Edit Mode) */}
+      {/* EDIT CONTROLS */}
       {isEditMode && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Columns className="w-5 h-5 text-blue-600" />
+              <FaColumns className="w-5 h-5 text-blue-600" />
               <span className="font-semibold text-gray-900">Layout Columns: {numColumns}</span>
             </div>
             <div className="flex items-center gap-2">
@@ -466,22 +476,19 @@ export default function SLDPage() {
                 className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                 disabled={numColumns <= 1}
               >
-                <Minus className="w-4 h-4" />
+                <FaMinus className="w-4 h-4" />
               </button>
               <button
                 onClick={() => adjustColumns(1)}
                 className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                 disabled={numColumns >= 8}
               >
-                <Plus className="w-4 h-4" />
+                <FaPlus className="w-4 h-4" />
               </button>
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-2">
             Click on equipment badges (C# R#) to change their position in the flowchart
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            💡 Reducing columns will automatically reorganize equipment to fit
           </p>
           {hasUnsavedChanges && (
             <p className="text-sm text-amber-600 mt-1 font-medium">
@@ -491,7 +498,7 @@ export default function SLDPage() {
         </div>
       )}
 
-      {/* Status Legend */}
+      {/* LEGEND */}
       <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
         <h3 className="font-semibold text-gray-900 mb-3">Status Legend</h3>
         <div className="flex flex-wrap gap-4">
@@ -506,7 +513,7 @@ export default function SLDPage() {
         </div>
       </div>
 
-      {/* SLD Diagram */}
+      {/* CANVAS / DIAGRAM AREA */}
       <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-sm border border-gray-200 p-8 overflow-auto">
         {isLoading ? (
           <div className="flex justify-center items-center min-h-[600px]">
@@ -514,12 +521,22 @@ export default function SLDPage() {
           </div>
         ) : selectedLab === "all" ? (
           <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500">
-            <AlertCircle className="w-16 h-16 text-gray-300 mb-4" />
-            <p className="text-lg">Please select a lab to view equipment layout</p>
+            {user.role === "TRAINER" ? (
+               <>
+                 <FaExclamationCircle className="w-16 h-16 text-red-300 mb-4" />
+                 <p className="text-lg">No Lab Assigned</p>
+                 <p className="text-sm text-gray-400 mt-2">Please contact your administrator.</p>
+               </>
+            ) : (
+               <>
+                 <FaExclamationCircle className="w-16 h-16 text-gray-300 mb-4" />
+                 <p className="text-lg">Please select a lab to view equipment layout</p>
+               </>
+            )}
           </div>
         ) : equipment.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500">
-            <AlertCircle className="w-16 h-16 text-gray-300 mb-4" />
+            <FaExclamationCircle className="w-16 h-16 text-gray-300 mb-4" />
             <p className="text-lg">No equipment found in this lab</p>
           </div>
         ) : (
@@ -530,7 +547,7 @@ export default function SLDPage() {
               minHeight: `${layout.totalHeight + 100}px`
             }}
           >
-            {/* Column Grid Lines (Only in Edit Mode) */}
+            {/* GRID LINES (Edit Mode) */}
             {isEditMode && (
               <svg
                 className="absolute top-0 left-0 pointer-events-none"
@@ -565,7 +582,7 @@ export default function SLDPage() {
               </svg>
             )}
 
-            {/* Root Node */}
+            {/* ROOT NODE (Lab Name) */}
             <div 
               className="absolute"
               style={{ 
@@ -575,13 +592,7 @@ export default function SLDPage() {
             >
               <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-4 w-[280px]">
                 <div className="text-center">
-                  <h3 className="font-bold text-lg">{selectedLabData.name}</h3>
-                  <p className="text-xs text-blue-100 mt-1">
-                    {selectedLabData.institute?.name || ""}
-                  </p>
-                  <p className="text-xs text-blue-100 mt-0.5">
-                    {DEPARTMENT_DISPLAY_NAMES[selectedLabData.department] || ""}
-                  </p>
+                  <h3 className="font-bold text-lg">{currentLabName}</h3>
                   <div className="mt-2 pt-2 border-t border-blue-400">
                     <p className="text-sm font-semibold">
                       Total Equipment: {equipment.length}
@@ -591,15 +602,10 @@ export default function SLDPage() {
               </div>
             </div>
 
-            {/* SVG for connections */}
+            {/* CONNECTION LINES */}
             <svg 
               className="absolute pointer-events-none"
-              style={{ 
-                width: '100%',
-                height: '100%',
-                top: 0,
-                left: 0
-              }}
+              style={{ width: '100%', height: '100%', top: 0, left: 0 }}
             >
               <defs>
                 {layout.connections.map((conn, index) => (
@@ -617,7 +623,6 @@ export default function SLDPage() {
                 ))}
               </defs>
 
-              {/* Draw connections */}
               {layout.connections.map((conn, index) => {
                 const midY = (conn.startY + 50 + conn.endY + 50) / 2;
                 return (
@@ -638,7 +643,7 @@ export default function SLDPage() {
               })}
             </svg>
 
-            {/* Equipment Nodes */}
+            {/* EQUIPMENT NODES */}
             {layout.nodes.map((node) => (
               <EquipmentNode
                 key={node.equipment.id}
@@ -655,13 +660,11 @@ export default function SLDPage() {
   );
 }
 
-// Equipment Node Wrapper with Edit Capability
 function EquipmentNode({ node, isEditMode, numColumns, onPositionChange }) {
   const [showPositionPicker, setShowPositionPicker] = useState(false);
   const [tempColumn, setTempColumn] = useState(node.column);
   const [tempRow, setTempRow] = useState(node.row);
 
-  // Update temp values when node changes
   useEffect(() => {
     setTempColumn(node.column);
     setTempRow(node.row);
@@ -690,20 +693,18 @@ function EquipmentNode({ node, isEditMode, numColumns, onPositionChange }) {
       }}
     >
       <div className="relative">
-        {/* Edit Mode Indicator */}
         {isEditMode && (
           <div 
             className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-2 py-1 rounded text-xs cursor-pointer hover:bg-blue-700 flex items-center gap-1 shadow-md z-10"
             onClick={handleBadgeClick}
           >
-            <GripVertical className="w-3 h-3" />
+            <FaGripVertical className="w-3 h-3" />
             C{node.column + 1} R{node.row + 1}
           </div>
         )}
         
         <EquipmentNodeComponent data={{ equipment: node.equipment }} />
 
-        {/* Position Picker Modal */}
         {showPositionPicker && (
           <div 
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-50"
@@ -719,7 +720,7 @@ function EquipmentNode({ node, isEditMode, numColumns, onPositionChange }) {
                   onClick={() => setShowPositionPicker(false)}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  <X className="w-5 h-5" />
+                  <FaTimes className="w-5 h-5" />
                 </button>
               </div>
               

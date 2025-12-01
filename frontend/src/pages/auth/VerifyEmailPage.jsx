@@ -1,11 +1,7 @@
-// =====================================================
-// 18. src/pages/auth/VerifyEmailPage.jsx
-// =====================================================
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
-import { Activity, Mail, AlertCircle, CheckCircle } from "lucide-react";
+import { FaEnvelope, FaExclamationCircle, FaCheckCircle } from "react-icons/fa";
 
 export default function VerifyEmailPage() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -85,7 +81,7 @@ export default function VerifyEmailPage() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Mail className="w-12 h-12 text-blue-900" />
+            <FaEnvelope className="w-12 h-12 text-blue-900" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">
             Verify Your Email
@@ -99,14 +95,14 @@ export default function VerifyEmailPage() {
         <div className="bg-white rounded-lg shadow-md p-8">
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <FaExclamationCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <span className="text-sm text-red-800">{error}</span>
             </div>
           )}
 
           {success && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <FaCheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
               <span className="text-sm text-green-800">
                 Email verified successfully! Redirecting...
               </span>

@@ -1,14 +1,14 @@
 /*
  * =====================================================
- * 3. frontend/src/components/dashboard/AlertsList.jsx (FIXED)
+ * 3. frontend/src/components/dashboard/AlertsList.jsx
  * =====================================================
  */
 import {
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  HelpCircle,
-} from "lucide-react";
+  FaExclamationTriangle,
+  FaCheckCircle,
+  FaClock,
+  FaQuestionCircle,
+} from "react-icons/fa";
 
 // Helper to format department names
 const DEPARTMENT_DISPLAY_NAMES = {
@@ -26,19 +26,19 @@ const DEPARTMENT_DISPLAY_NAMES = {
 const SEVERITY_CONFIG = {
   CRITICAL: {
     color: "bg-red-100 text-red-800 border-red-200",
-    icon: AlertTriangle,
+    icon: FaExclamationTriangle,
   },
   HIGH: {
     color: "bg-orange-100 text-orange-800 border-orange-200",
-    icon: AlertTriangle,
+    icon: FaExclamationTriangle,
   },
   MEDIUM: {
     color: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    icon: Clock,
+    icon: FaClock,
   },
   LOW: {
     color: "bg-blue-100 text-blue-800 border-blue-200",
-    icon: HelpCircle,
+    icon: FaQuestionCircle,
   },
 };
 
@@ -51,7 +51,7 @@ export default function AlertsList({ alerts, onResolve }) {
     <div className="space-y-3">
       {alerts.length === 0 ? (
         <div className="text-center py-8">
-          <CheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <FaCheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">No unresolved alerts</p>
         </div>
       ) : (
@@ -82,7 +82,7 @@ export default function AlertsList({ alerts, onResolve }) {
                   {/* Alert Message */}
                   <p className="text-sm mb-2">{alert.message}</p>
 
-                  {/* Alert Context - FIXED */}
+                  {/* Alert Context */}
                   {equipment && lab && (
                     <div className="text-xs opacity-80">
                       {lab.instituteId && (

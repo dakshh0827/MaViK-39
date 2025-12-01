@@ -1,21 +1,16 @@
-/*
- * =====================================================
- * frontend/src/pages/ProfilePage.jsx (UPDATED)
- * =====================================================
- */
 import { useState } from "react";
 import { useAuthStore } from "../stores/authStore";
 import {
-  User,
-  Mail,
-  Phone,
-  Building,
-  Lock,
-  Check,
-  AlertCircle,
-  Briefcase,
-  Book,
-} from "lucide-react";
+  FaUser,
+  FaEnvelope,
+  FaPhone,
+  FaBuilding,
+  FaLock,
+  FaCheck,
+  FaExclamationCircle,
+  FaBriefcase,
+  FaBook,
+} from "react-icons/fa";
 
 // Department display names
 const DEPARTMENT_DISPLAY_NAMES = {
@@ -109,9 +104,9 @@ export default function ProfilePage() {
           }`}
         >
           {message.type === "success" ? (
-            <Check className="w-5 h-5" />
+            <FaCheck className="w-5 h-5" />
           ) : (
-            <AlertCircle className="w-5 h-5" />
+            <FaExclamationCircle className="w-5 h-5" />
           )}
           <span>{message.text}</span>
         </div>
@@ -204,7 +199,7 @@ export default function ProfilePage() {
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <User className="w-5 h-5 text-gray-400" />
+              <FaUser className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600">Name</p>
                 <p className="font-medium">
@@ -214,7 +209,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Mail className="w-5 h-5 text-gray-400" />
+              <FaEnvelope className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600">Email</p>
                 <p className="font-medium">{user?.email}</p>
@@ -222,7 +217,7 @@ export default function ProfilePage() {
             </div>
 
             {/* <div className="flex items-center gap-3">
-              <Phone className="w-5 h-5 text-gray-400" />
+              <FaPhone className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600">Phone</p>
                 <p className="font-medium">{user?.phone || "Not provided"}</p>
@@ -230,7 +225,7 @@ export default function ProfilePage() {
             </div> */}
 
             <div className="flex items-center gap-3">
-              <Briefcase className="w-5 h-5 text-gray-400" />
+              <FaBriefcase className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600">Role</p>
                 <p className="font-medium">{getRoleDisplay(user?.role)}</p>
@@ -240,7 +235,7 @@ export default function ProfilePage() {
             {/* UPDATED: Institute - shown for both LAB_MANAGER and TRAINER */}
             {(user?.role === "LAB_MANAGER" || user?.role === "TRAINER") && (
               <div className="flex items-center gap-3">
-                <Building className="w-5 h-5 text-gray-400" />
+                <FaBuilding className="w-5 h-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-600">Institute</p>
                   <p className="font-medium">
@@ -254,7 +249,7 @@ export default function ProfilePage() {
             {(user?.role === "LAB_MANAGER" || user?.role === "TRAINER") &&
               user?.department && (
                 <div className="flex items-center gap-3">
-                  <Book className="w-5 h-5 text-gray-400" />
+                  <FaBook className="w-5 h-5 text-gray-400" />
                   <div>
                     <p className="text-sm text-gray-600">Department</p>
                     <p className="font-medium">
@@ -269,7 +264,7 @@ export default function ProfilePage() {
             {(user?.role === "LAB_MANAGER" || user?.role === "TRAINER") &&
               user?.lab && (
                 <div className="flex items-center gap-3">
-                  <Building className="w-5 h-5 text-gray-400" />
+                  <FaBuilding className="w-5 h-5 text-gray-400" />
                   <div>
                     <p className="text-sm text-gray-600">
                       {user.role === "LAB_MANAGER" ? "Primary Lab" : "Lab"}
@@ -303,7 +298,7 @@ export default function ProfilePage() {
                 Current Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <FaLock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="password"
                   value={passwordData.currentPassword}

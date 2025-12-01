@@ -1,66 +1,64 @@
 /*
  * =====================================================
- * EquipmentTable.jsx - FIXED
+ * EquipmentTable.jsx
  * =====================================================
  */
-// Copy this into: frontend/src/components/dashboard/EquipmentTable.jsx
-
 import { useState } from "react";
 import { 
-  Edit2, 
-  Trash2, 
-  Eye, 
-  MoreVertical,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  XCircle 
-} from "lucide-react";
+  FaEdit, 
+  FaTrash, 
+  FaEye, 
+  FaEllipsisV,
+  FaExclamationCircle,
+  FaCheckCircle,
+  FaClock,
+  FaTimesCircle 
+} from "react-icons/fa";
+import { FaCirclePause } from "react-icons/fa6";
 
 const STATUS_CONFIG = {
   OPERATIONAL: { 
     color: "bg-green-100 text-green-800", 
-    icon: CheckCircle,
+    icon: FaCheckCircle,
     label: "Operational" 
   },
   IN_USE: { 
     color: "bg-blue-100 text-blue-800", 
-    icon: Clock,
+    icon: FaClock,
     label: "In Use" 
   },
   IN_CLASS: { 
-    color: "bg-purple-100 text-purple-800", 
-    icon: Clock,
+    color: "bg-blue-100 text-blue-800", 
+    icon: FaClock,
     label: "In Class" 
   },
   IDLE: { 
     color: "bg-gray-100 text-gray-800", 
-    icon: Clock,
+    icon: FaCirclePause,
     label: "Idle" 
   },
   MAINTENANCE: { 
-    color: "bg-yellow-100 text-yellow-800", 
-    icon: AlertCircle,
+    color: "bg-amber-100 text-amber-800", 
+    icon: FaExclamationCircle,
     label: "Maintenance" 
   },
   FAULTY: { 
     color: "bg-red-100 text-red-800", 
-    icon: XCircle,
+    icon: FaTimesCircle,
     label: "Faulty" 
   },
   OFFLINE: { 
     color: "bg-gray-100 text-gray-800", 
-    icon: XCircle,
+    icon: FaTimesCircle,
     label: "Offline" 
   },
   WARNING: { 
     color: "bg-orange-100 text-orange-800", 
-    icon: AlertCircle,
+    icon: FaExclamationCircle,
     label: "Warning" 
   },
 };
 
-// Helper function to safely get institute name
 const getInstituteName = (institute) => {
   if (!institute) return "";
   if (typeof institute === 'string') return institute;
@@ -227,7 +225,7 @@ export default function EquipmentTable({
                       onClick={() => handleMenuToggle(item.id)}
                       className="p-1 hover:bg-gray-100 rounded transition-colors"
                     >
-                      <MoreVertical className="w-5 h-5 text-gray-600" />
+                      <FaEllipsisV className="w-4 h-4 text-gray-600" />
                     </button>
 
                     {activeMenu === item.id && (
@@ -242,7 +240,7 @@ export default function EquipmentTable({
                               onClick={() => handleAction('view', item)}
                               className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                             >
-                              <Eye className="w-4 h-4" />
+                              <FaEye className="w-4 h-4" />
                               View Details
                             </button>
                           )}
@@ -251,7 +249,7 @@ export default function EquipmentTable({
                               onClick={() => handleAction('edit', item)}
                               className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <FaEdit className="w-4 h-4" />
                               Edit
                             </button>
                           )}
@@ -260,7 +258,7 @@ export default function EquipmentTable({
                               onClick={() => handleAction('delete', item)}
                               className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <FaTrash className="w-4 h-4" />
                               Delete
                             </button>
                           )}

@@ -1,22 +1,17 @@
-/*
- * =====================================================
- * frontend/src/pages/auth/SignupPage.jsx (UPDATED)
- * =====================================================
- */
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
 import { useInstituteStore } from "../../stores/instituteStore";
 import {
-  Activity,
-  User,
-  Mail,
-  Lock,
-  Building,
-  AlertCircle,
-  Hash,
-  Book,
-} from "lucide-react";
+  FaChartLine,
+  FaUser,
+  FaEnvelope,
+  FaLock,
+  FaBuilding,
+  FaExclamationCircle,
+  FaHashtag,
+  FaBook,
+} from "react-icons/fa";
 
 // Department names from the schema
 const departments = [
@@ -143,7 +138,7 @@ export default function SignupPage() {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Activity className="w-12 h-12 text-blue-900" />
+            <FaChartLine className="w-12 h-12 text-blue-900" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
           <p className="text-gray-600 mt-2">
@@ -155,7 +150,7 @@ export default function SignupPage() {
         <div className="bg-white rounded-lg shadow-md p-8">
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <FaExclamationCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <span className="text-sm text-red-800">{error}</span>
             </div>
           )}
@@ -168,7 +163,7 @@ export default function SignupPage() {
                   First Name <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <FaUser className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
                     name="firstName"
@@ -202,7 +197,7 @@ export default function SignupPage() {
                   Email Address <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="email"
                     name="email"
@@ -264,7 +259,7 @@ export default function SignupPage() {
                     Institute <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <FaBuilding className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <select
                       name="instituteId"
                       value={formData.instituteId}
@@ -293,7 +288,7 @@ export default function SignupPage() {
                     Department <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Book className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <FaBook className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <select
                       name="department"
                       value={formData.department}
@@ -322,7 +317,7 @@ export default function SignupPage() {
                     Lab ID <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <FaHashtag className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                       type="text"
                       name="labId"
@@ -349,7 +344,7 @@ export default function SignupPage() {
                   Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <FaLock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="password"
                     name="password"

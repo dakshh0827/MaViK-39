@@ -7,19 +7,22 @@ import EquipmentTable from "../../components/dashboard/EquipmentTable";
 import AlertsList from "../../components/dashboard/AlertsList";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import {
-  Activity,
-  AlertTriangle,
-  Wrench,
-  TrendingUp,
-  Search,
-  Building,
-  BarChart2,
-  Clock,
-  UserCheck,
-  CheckCircle2,
-  XCircle,
-  PlayCircle
-} from "lucide-react";
+  FaChartLine,
+  FaExclamationTriangle,
+  FaWrench,
+  FaArrowUp,
+  FaSearch,
+  FaBuilding,
+  FaChartBar,
+  FaClock,
+  FaUserCheck,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaPlayCircle,
+  FaExclamationCircle
+} from "react-icons/fa";
+import { FaCirclePause } from "react-icons/fa6";
+import { ImLab } from "react-icons/im";
 
 // --- Internal Component: SVG Health History Chart ---
 const HealthHistoryChart = ({ currentScore = 0 }) => {
@@ -185,7 +188,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
                 </h4>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[10px] text-gray-500 flex items-center gap-1">
-                    <Building className="w-3 h-3" />{" "}
+                    <ImLab className="w-3 h-3" />{" "}
                     {alert.lab?.name || "Unknown Lab"}
                   </span>
                   <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
@@ -194,7 +197,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
                 </div>
               </div>
               <span className="text-[10px] text-gray-400 whitespace-nowrap flex items-center gap-1">
-                <Clock className="w-3 h-3" />
+                <FaClock className="w-3 h-3" />
                 {new Date(
                   alert.resolvedAt || alert.createdAt
                 ).toLocaleDateString("en-US", {
@@ -209,7 +212,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
             {alert.isResolved && (
               <div className="pt-2 mt-1 border-t border-gray-100 grid gap-1">
                 <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-medium">
-                  <UserCheck className="w-3 h-3" />
+                  <FaUserCheck className="w-3 h-3" />
                   Resolved by {alert.resolver?.name || "Admin"}
                 </div>
               </div>
@@ -293,21 +296,25 @@ export default function TrainerDashboard() {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case "OPERATIONAL": return <CheckCircle2 className="w-4 h-4 text-emerald-600" />;
-      case "FAULTY": return <XCircle className="w-4 h-4 text-red-600" />;
-      case "MAINTENANCE": return <Wrench className="w-4 h-4 text-orange-600" />;
-      case "IN_USE": return <PlayCircle className="w-4 h-4 text-blue-600" />;
-      default: return <Activity className="w-4 h-4 text-gray-600" />;
+      case "OPERATIONAL": return <FaCheckCircle className="w-4 h-4 text-green-600" />;
+      case "FAULTY": return <FaTimesCircle className="w-4 h-4 text-red-600" />;
+      case "MAINTENANCE": return <FaWrench className="w-4 h-4 text-amber-600" />;
+      case "IN_CLASS": return <FaClock className="w-4 h-4 text-blue-600" />;
+      case "IDLE": return <FaCirclePause className="w-4 h-4 text-gray-600" />;
+      case "WARNING": return <FaExclamationCircle className="w-4 h-4 text-orange-600" />;
+      default: return <FaChartLine className="w-4 h-4 text-gray-600" />;
     }
   };
 
   const getStatusBg = (status) => {
     switch (status) {
-      case "OPERATIONAL": return "bg-emerald-50 border-emerald-100";
-      case "FAULTY": return "bg-red-50 border-red-100";
-      case "MAINTENANCE": return "bg-orange-50 border-orange-100";
-      case "IN_USE": return "bg-blue-50 border-blue-100";
-      default: return "bg-gray-50 border-gray-100";
+      case "OPERATIONAL": return "bg-green-100 border-green-100";
+      case "FAULTY": return "bg-red-100 border-red-100";
+      case "MAINTENANCE": return "bg-amber-100 border-amber-100";
+      case "IN_CLASS": return "bg-blue-100 border-blue-100";
+      case "IDLE": return "bg-gray-100 border-gray-100";
+      case "WARNING": return "bg-orange-100 border-orange-100";
+      default: return "bg-gray-100 border-gray-100";
     }
   };
 
@@ -321,28 +328,28 @@ export default function TrainerDashboard() {
 
   const stats = [
     {
-      icon: Activity,
+      icon: FaChartLine,
       title: "Total Equipment",
       value: overview?.overview?.totalEquipment || 0,
       color: "text-blue-600",
       bg: "bg-blue-50",
     },
     {
-      icon: TrendingUp,
+      icon: FaArrowUp,
       title: "Active Equipment",
       value: overview?.overview?.activeEquipment || 0,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
     },
     {
-      icon: AlertTriangle,
+      icon: FaExclamationTriangle,
       title: "Unresolved Alerts",
       value: overview?.overview?.unresolvedAlerts || 0,
       color: "text-red-600",
       bg: "bg-red-50",
     },
     {
-      icon: Wrench,
+      icon: FaWrench,
       title: "Maintenance Due",
       value: overview?.overview?.maintenanceDue || 0,
       color: "text-orange-600",
@@ -386,7 +393,7 @@ export default function TrainerDashboard() {
           <div className="flex-shrink-0 px-3 py-2 border-b border-gray-100 bg-white flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
-                <BarChart2 className="w-4 h-4" />
+                <FaChartBar className="w-4 h-4" />
               </div>
               <h2 className="text-sm font-bold text-gray-800">
                 Lab Status & Health
@@ -454,7 +461,7 @@ export default function TrainerDashboard() {
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-100 bg-white flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                    <Building className="w-4 h-4" />
+                    <ImLab className="w-4 h-4" />
                 </div>
                 <div>
                     <h2 className="text-sm font-bold text-gray-800">Lab Equipment</h2>
@@ -466,7 +473,7 @@ export default function TrainerDashboard() {
 
             <div className="flex items-center gap-3 flex-1 justify-end">
               <div className="relative max-w-[240px] w-full">
-                <Search className="absolute left-3 top-2 w-3.5 h-3.5 text-gray-400" />
+                <FaSearch className="absolute left-3 top-2 w-3.5 h-3.5 text-gray-400" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -513,8 +520,8 @@ export default function TrainerDashboard() {
         <div className="col-span-12 lg:col-span-3 h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col min-h-0">
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-100 bg-white flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="relative p-1.5 bg-yellow-50 text-yellow-600 rounded-lg">
-                <AlertTriangle className="w-4 h-4" />
+              <div className="relative p-1.5 bg-red-100 text-red-600 rounded-lg">
+                <FaExclamationTriangle className="w-4 h-4" />
                 {alerts.length > 0 && (
                   <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-white" />
                 )}

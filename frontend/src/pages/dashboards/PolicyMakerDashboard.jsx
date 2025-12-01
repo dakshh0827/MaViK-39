@@ -22,33 +22,33 @@ import LabManagerForm from "../../components/admin/labManagerForm";
 import InstituteManagerForm from "../../components/admin/InstituteManagerForm";
 import api from "../../lib/axios";
 import {
-  Activity,
-  Building,
-  AlertTriangle,
-  TrendingUp,
-  Filter,
-  Users,
-  Box,
-  Edit,
-  Trash2,
-  AlertCircle,
-  Package,
-  ExternalLink,
-  LayoutGrid,
-  List,
-  ArrowRight,
-  X,
-  CheckCircle,
-  XCircle,
-  Calendar,
-  User,
-  MapPin,
-  FileText,
-  History,
-  MessageSquare,
-  Clock,
-  UserCheck,
-} from "lucide-react";
+  FaChartLine,
+  FaBuilding,
+  FaExclamationTriangle,
+  FaArrowUp,
+  FaFilter,
+  FaUsers,
+  FaBox,
+  FaEdit,
+  FaTrash,
+  FaExclamationCircle,
+  FaExternalLinkAlt,
+  FaTh,
+  FaList,
+  FaArrowRight,
+  FaTimes,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaCalendarAlt,
+  FaUser,
+  FaMapMarkerAlt,
+  FaFileAlt,
+  FaHistory,
+  FaCommentAlt,
+  FaClock,
+  FaUserCheck,
+} from "react-icons/fa";
+import { ImLab } from "react-icons/im";
 
 const DEPARTMENT_DISPLAY_NAMES = {
   FITTER_MANUFACTURING: "Fitter/Manufacturing",
@@ -297,7 +297,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
                 </h4>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[10px] text-gray-500 flex items-center gap-1">
-                    <Building className="w-3 h-3" />{" "}
+                    <ImLab className="w-3 h-3" />{" "}
                     {alert.lab?.name || "Unknown Lab"}
                   </span>
                   <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
@@ -306,7 +306,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
                 </div>
               </div>
               <span className="text-[10px] text-gray-400 whitespace-nowrap flex items-center gap-1">
-                <Clock className="w-3 h-3" />
+                <FaClock className="w-3 h-3" />
                 {new Date(
                   alert.resolvedAt || alert.createdAt
                 ).toLocaleDateString(undefined, {
@@ -321,12 +321,12 @@ const CompactHistoryList = ({ alerts, loading }) => {
             {alert.isResolved && (
               <div className="pt-2 mt-1 border-t border-gray-100 grid gap-1">
                 <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-medium">
-                  <UserCheck className="w-3 h-3" />
+                  <FaUserCheck className="w-3 h-3" />
                   Resolved by {alert.resolver?.name || "Admin"}
                 </div>
                 {alert.resolutionNotes && (
                   <div className="flex items-start gap-1.5 text-[10px] text-gray-500 italic pl-0.5">
-                    <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />"
+                    <FaCommentAlt className="w-3 h-3 mt-0.5 flex-shrink-0" />"
                     {alert.resolutionNotes}"
                   </div>
                 )}
@@ -566,7 +566,7 @@ export default function PolicyMakerDashboard() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <FaExclamationCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
             Failed to Load Dashboard
           </h2>
@@ -582,28 +582,28 @@ export default function PolicyMakerDashboard() {
 
   const standardStats = [
     {
-      icon: Building,
+      icon: FaBuilding,
       title: "Institutions",
       value: overview?.overview?.totalInstitutions || 0,
       color: "text-indigo-600",
       bg: "bg-indigo-50",
     },
     {
-      icon: Activity,
+      icon: FaChartLine,
       title: "Total Equipment",
       value: overview?.overview?.totalEquipment || 0,
       color: "text-blue-600",
       bg: "bg-blue-50",
     },
     {
-      icon: Users,
+      icon: FaUsers,
       title: "Lab Managers",
       value: labManagersCount,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
     },
     {
-      icon: Box,
+      icon: FaBox,
       title: "Items in Stock",
       value: pagination.total || 0,
       color: "text-purple-600",
@@ -673,7 +673,7 @@ export default function PolicyMakerDashboard() {
           <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col min-h-0">
             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-white flex-shrink-0 gap-4">
               <div className="flex items-center gap-2 flex-shrink-0">
-                <Building className="w-5 h-5 text-blue-600" />
+                <ImLab className="w-5 h-5 text-blue-600" />
                 <h3 className="text-base font-bold text-gray-800">
                   Labs Directory
                 </h3>
@@ -683,7 +683,7 @@ export default function PolicyMakerDashboard() {
               </div>
               <div className="flex items-center gap-3 flex-1 justify-end">
                 <div className="flex items-center gap-2 max-w-2xl flex-1 justify-end">
-                  <Filter className="w-4 h-4 text-gray-400" />
+                  <FaFilter className="w-4 h-4 text-gray-400" />
                   <select
                     value={selectedInstitute}
                     onChange={handleInstituteChange}
@@ -719,7 +719,7 @@ export default function PolicyMakerDashboard() {
                         : "text-gray-400 hover:text-gray-600"
                     }`}
                   >
-                    <LayoutGrid className="w-4 h-4" />
+                    <FaTh className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setViewMode("list")}
@@ -729,7 +729,7 @@ export default function PolicyMakerDashboard() {
                         : "text-gray-400 hover:text-gray-600"
                     }`}
                   >
-                    <List className="w-4 h-4" />
+                    <FaList className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -738,7 +738,7 @@ export default function PolicyMakerDashboard() {
             <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-gray-50/30">
               {labsList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                  <Building className="w-12 h-12 mb-2 opacity-20" />
+                  <ImLab className="w-12 h-12 mb-2 opacity-20" />
                   <p className="text-sm">No labs match the selected filters.</p>
                 </div>
               ) : viewMode === "cards" ? (
@@ -751,20 +751,20 @@ export default function PolicyMakerDashboard() {
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                          <Building className="w-5 h-5" />
+                          <ImLab className="w-5 h-5" />
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleOpenEditLab(lab)}
                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                           >
-                            <Edit className="w-4 h-4" />
+                            <FaEdit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteLab(lab.labId)}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <FaTrash className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -777,11 +777,11 @@ export default function PolicyMakerDashboard() {
                         </h4>
                         <div className="space-y-1">
                           <p className="text-xs text-gray-500 flex items-center gap-1 truncate">
-                            <MapPin className="w-3 h-3" />{" "}
+                            <FaMapMarkerAlt className="w-3 h-3" />{" "}
                             {lab.institute?.name || "N/A"}
                           </p>
                           <p className="text-xs text-gray-500 flex items-center gap-1 truncate">
-                            <Box className="w-3 h-3" />{" "}
+                            <FaBox className="w-3 h-3" />{" "}
                             {DEPARTMENT_DISPLAY_NAMES[lab.department] ||
                               lab.department}
                           </p>
@@ -792,7 +792,7 @@ export default function PolicyMakerDashboard() {
                           #{lab.labId.slice(0, 8)}
                         </span>
                         <span className="text-blue-600 font-medium flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          View Details <ArrowRight className="w-3 h-3" />
+                          View Details <FaArrowRight className="w-3 h-3" />
                         </span>
                       </div>
                     </div>
@@ -811,7 +811,7 @@ export default function PolicyMakerDashboard() {
                         className="flex items-center gap-4 flex-1 text-left"
                       >
                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                          <Building className="w-4 h-4" />
+                          <ImLab className="w-4 h-4" />
                         </div>
                         <div className="grid grid-cols-12 gap-4 flex-1 items-center">
                           <div className="col-span-4">
@@ -836,19 +836,19 @@ export default function PolicyMakerDashboard() {
                           onClick={() => handleOpenEditLab(lab)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         >
-                          <Edit className="w-4 h-4" />
+                          <FaEdit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteLab(lab.labId)}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <FaTrash className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleLabClick(lab.labId)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         >
-                          <ExternalLink className="w-4 h-4" />
+                          <FaExternalLinkAlt className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -865,7 +865,7 @@ export default function PolicyMakerDashboard() {
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0 bg-white">
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <FaExclamationTriangle className="w-4 h-4 text-red-500" />
                   {activeAlerts.length > 0 && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                   )}
@@ -881,7 +881,7 @@ export default function PolicyMakerDashboard() {
                       : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
-                  <List className="w-3 h-3" /> Active
+                  <FaList className="w-3 h-3" /> Active
                 </button>
                 <button
                   onClick={() => handleTabChange("history")}
@@ -891,7 +891,7 @@ export default function PolicyMakerDashboard() {
                       : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
-                  <History className="w-3 h-3" /> History
+                  <FaHistory className="w-3 h-3" /> History
                 </button>
               </div>
             </div>
@@ -923,7 +923,7 @@ export default function PolicyMakerDashboard() {
             <div className="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 flex-shrink-0 bg-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-blue-600" />
+                  <FaBox className="w-4 h-4 text-blue-600" />
                   <h3 className="text-sm font-bold text-gray-800">
                     Reorder Requests
                   </h3>
@@ -933,7 +933,7 @@ export default function PolicyMakerDashboard() {
                   className="text-gray-400 hover:text-blue-600 transition-colors"
                   title="View Full Page"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <FaExternalLinkAlt className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div className="flex bg-gray-100 p-1 rounded-lg w-full">
@@ -962,7 +962,7 @@ export default function PolicyMakerDashboard() {
             <div className="flex-1 overflow-y-auto p-2 min-h-0 bg-gray-50/50">
               {displayedReorders.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 py-4">
-                  <Package className="w-8 h-8 mb-2 opacity-20" />
+                  <FaBox className="w-8 h-8 mb-2 opacity-20" />
                   <p className="text-xs">No requests found</p>
                 </div>
               ) : (
@@ -1027,7 +1027,7 @@ export default function PolicyMakerDashboard() {
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
-                  <Package className="w-5 h-5" />
+                  <FaBox className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">
@@ -1042,7 +1042,7 @@ export default function PolicyMakerDashboard() {
                 onClick={() => setSelectedRequest(null)}
                 className="p-2 hover:bg-gray-200 rounded-full transition-colors"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <FaTimes className="w-5 h-5 text-gray-500" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -1079,7 +1079,7 @@ export default function PolicyMakerDashboard() {
                           : "bg-yellow-100 text-yellow-700"
                       }`}
                     >
-                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <FaExclamationTriangle className="w-3.5 h-3.5" />
                       {selectedRequest.priority}
                     </span>
                   </div>
@@ -1089,7 +1089,7 @@ export default function PolicyMakerDashboard() {
                     Requested Date
                   </span>
                   <div className="mt-1 flex items-center gap-2 text-sm text-gray-900 font-medium">
-                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <FaCalendarAlt className="w-4 h-4 text-gray-400" />
                     {new Date(selectedRequest.createdAt).toLocaleDateString()}
                   </div>
                 </div>
@@ -1098,7 +1098,7 @@ export default function PolicyMakerDashboard() {
                 <div className="space-y-4">
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                      <Box className="w-4 h-4" /> Equipment
+                      <FaBox className="w-4 h-4" /> Equipment
                     </h4>
                     <p className="text-base font-semibold text-gray-900">
                       {selectedRequest.equipmentName}
@@ -1109,7 +1109,7 @@ export default function PolicyMakerDashboard() {
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" /> Quantity Info
+                      <FaArrowUp className="w-4 h-4" /> Quantity Info
                     </h4>
                     <div className="flex items-center gap-4 text-sm">
                       <div>
@@ -1131,7 +1131,7 @@ export default function PolicyMakerDashboard() {
                 <div className="space-y-4">
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                      <MapPin className="w-4 h-4" /> Location
+                      <FaMapMarkerAlt className="w-4 h-4" /> Location
                     </h4>
                     <p className="text-sm font-medium text-gray-900">
                       {selectedRequest.labName}
@@ -1142,7 +1142,7 @@ export default function PolicyMakerDashboard() {
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                      <User className="w-4 h-4" /> Requested By
+                      <FaUser className="w-4 h-4" /> Requested By
                     </h4>
                     <p className="text-sm text-gray-900">
                       {selectedRequest.requestedBy || "Lab Manager"}
@@ -1155,7 +1155,7 @@ export default function PolicyMakerDashboard() {
               </div>
               <div>
                 <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                  <FileText className="w-4 h-4" /> Reason / Description
+                  <FaFileAlt className="w-4 h-4" /> Reason / Description
                 </h4>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 text-sm text-gray-700 leading-relaxed">
                   {selectedRequest.description ||
@@ -1184,7 +1184,7 @@ export default function PolicyMakerDashboard() {
                           <LoadingSpinner size="sm" color="white" />
                         ) : (
                           <>
-                            <CheckCircle className="w-4 h-4" /> Approve Request
+                            <FaCheckCircle className="w-4 h-4" /> Approve Request
                           </>
                         )}
                       </button>
@@ -1202,7 +1202,7 @@ export default function PolicyMakerDashboard() {
                           <LoadingSpinner size="sm" color="red" />
                         ) : (
                           <>
-                            <XCircle className="w-4 h-4" /> Reject Request
+                            <FaTimesCircle className="w-4 h-4" /> Reject Request
                           </>
                         )}
                       </button>

@@ -24,6 +24,7 @@ import ReportGenerationPage from "./pages/ReportGenerationPage";
 import LabAnalyticsPage from "./pages/dashboards/LabAnalyticsPage";
 import ReorderRequestsPage from "./pages/dashboards/ReorderRequestsPage";
 import UserGuidePage from "./pages/UserGuidePage";
+import VideoResourcesPage from "./pages/VideoResourcePage";
 
 // Layout
 import DashboardLayout from "./components/layout/DashboardLayout";
@@ -78,6 +79,7 @@ function App() {
           <Route path="/help" element={<HelpSupportPage />} />
           <Route path="/sld" element={<SLDPage />} />
           <Route path="/user-guide" element={<UserGuidePage />} />
+          <Route path="/video-resources" element={<VideoResourcesPage />} />
           <Route
             path="/dashboard/lab-analytics/:labId"
             element={<LabAnalyticsPage />}

@@ -5,12 +5,10 @@
  */
 import { useState } from "react";
 import {
-  AlertCircle,
-  Package,
-  CheckCircle,
-  X,
-  ExternalLink,
-} from "lucide-react";
+  FaExclamationCircle,
+  FaBox,
+  FaCheckCircle,
+} from "react-icons/fa";
 import ReorderModal from "./ReorderModal";
 
 const STATUS_COLORS = {
@@ -51,7 +49,7 @@ export default function BreakdownEquipmentTable({
   if (breakdowns.length === 0) {
     return (
       <div className="text-center py-12">
-        <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <FaCheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
         <p className="text-gray-500 text-lg">No breakdown equipment</p>
         <p className="text-gray-400 text-sm mt-2">
           All equipment is operational
@@ -95,7 +93,7 @@ export default function BreakdownEquipmentTable({
                 <tr key={breakdown.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+                      <FaExclamationCircle className="w-5 h-5 text-red-500 mr-2" />
                       <div>
                         <div className="text-sm font-medium text-gray-900">
                           {equipment.name}
@@ -144,7 +142,7 @@ export default function BreakdownEquipmentTable({
                           onClick={() => handleReorderClick(breakdown)}
                           className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
                         >
-                          <Package className="w-4 h-4" />
+                          <FaBox className="w-4 h-4" />
                           Reorder
                         </button>
                       )}
@@ -170,7 +168,7 @@ export default function BreakdownEquipmentTable({
                           onClick={() => onResolve(breakdown.id)}
                           className="text-green-600 hover:text-green-900 flex items-center gap-1"
                         >
-                          <CheckCircle className="w-4 h-4" />
+                          <FaCheckCircle className="w-4 h-4" />
                           Resolve
                         </button>
                       )}

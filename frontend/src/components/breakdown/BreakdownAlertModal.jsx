@@ -4,7 +4,7 @@
  * =====================================================
  */
 import { useState } from "react";
-import { X, AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { FaTimes, FaExclamationCircle, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 
 export default function BreakdownAlertModal({
   isOpen,
@@ -44,13 +44,12 @@ export default function BreakdownAlertModal({
   if (!isOpen || !alert) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-yellow-100 rounded-lg">
-              <AlertCircle className="w-6 h-6 text-yellow-600" />
+              <FaExclamationCircle className="w-6 h-6 text-yellow-600" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
@@ -63,11 +62,10 @@ export default function BreakdownAlertModal({
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            <X className="w-6 h-6" />
+            <FaTimes className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-4">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -75,12 +73,10 @@ export default function BreakdownAlertModal({
             </div>
           )}
 
-          {/* Alert Message */}
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
             <p className="text-sm text-gray-700">{alert.message}</p>
           </div>
 
-          {/* Question */}
           <div>
             <p className="text-sm font-medium text-gray-700 mb-3">
               Is this equipment broken down?
@@ -94,7 +90,7 @@ export default function BreakdownAlertModal({
                     : "border-gray-200 hover:border-gray-300"
                 }`}
               >
-                <XCircle
+                <FaTimesCircle
                   className={`w-8 h-8 mx-auto mb-2 ${
                     isBreakdown === true ? "text-red-600" : "text-gray-400"
                   }`}
@@ -116,7 +112,7 @@ export default function BreakdownAlertModal({
                     : "border-gray-200 hover:border-gray-300"
                 }`}
               >
-                <CheckCircle
+                <FaCheckCircle
                   className={`w-8 h-8 mx-auto mb-2 ${
                     isBreakdown === false ? "text-green-600" : "text-gray-400"
                   }`}
@@ -132,7 +128,6 @@ export default function BreakdownAlertModal({
             </div>
           </div>
 
-          {/* Reason (if breakdown) */}
           {isBreakdown && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -149,7 +144,6 @@ export default function BreakdownAlertModal({
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center gap-3 p-6 border-t border-gray-200">
           <button
             onClick={handleSubmit}

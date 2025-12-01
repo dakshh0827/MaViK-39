@@ -4,7 +4,7 @@
  * =====================================================
  */
 import { useState, useEffect } from "react";
-import { X, AlertTriangle } from "lucide-react";
+import { FaTimes, FaExclamationTriangle } from "react-icons/fa";
 import { useEquipmentStore } from "../../stores/equipmentStore";
 
 export default function AddBreakdownModal({ isOpen, onClose, onSubmit }) {
@@ -16,7 +16,6 @@ export default function AddBreakdownModal({ isOpen, onClose, onSubmit }) {
 
   useEffect(() => {
     if (isOpen) {
-      // Fetch equipment when modal opens
       fetchEquipment();
     }
   }, [isOpen]);
@@ -51,13 +50,12 @@ export default function AddBreakdownModal({ isOpen, onClose, onSubmit }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-100 rounded-lg">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
+              <FaExclamationTriangle className="w-6 h-6 text-red-600" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
@@ -72,11 +70,10 @@ export default function AddBreakdownModal({ isOpen, onClose, onSubmit }) {
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            <X className="w-6 h-6" />
+            <FaTimes className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -84,7 +81,6 @@ export default function AddBreakdownModal({ isOpen, onClose, onSubmit }) {
             </div>
           )}
 
-          {/* Equipment Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Select Equipment <span className="text-red-500">*</span>
@@ -104,7 +100,6 @@ export default function AddBreakdownModal({ isOpen, onClose, onSubmit }) {
             </select>
           </div>
 
-          {/* Reason */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Reason for Breakdown <span className="text-red-500">*</span>
@@ -119,7 +114,6 @@ export default function AddBreakdownModal({ isOpen, onClose, onSubmit }) {
             />
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-3 pt-4">
             <button
               type="submit"

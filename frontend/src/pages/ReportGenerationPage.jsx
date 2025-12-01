@@ -1,17 +1,17 @@
 // =====================================================
-// 26. src/pages/ReportGenerationPage.jsx - FIXED
+// 26. src/pages/ReportGenerationPage.jsx
 // =====================================================
 
 import { useState } from "react";
 import { useReportStore } from "../stores/reportStore";
 import {
-  FileText,
-  Calendar,
-  Download,
-  Clock,
-  AlertCircle,
-  CheckCircle,
-} from "lucide-react";
+  FaFileAlt,
+  FaCalendarAlt,
+  FaDownload,
+  FaClock,
+  FaExclamationCircle,
+  FaCheckCircle,
+} from "react-icons/fa";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 
 export default function ReportGenerationPage() {
@@ -67,9 +67,7 @@ export default function ReportGenerationPage() {
         } report generated successfully!`,
       });
 
-      // Download PDF if available
       if (result.data.pdfUrl && formData.generatePDF) {
-        // Use the store's download method instead of window.open
         await downloadPDFByFilename(result.data.pdfUrl);
       }
     } catch (error) {
@@ -86,21 +84,21 @@ export default function ReportGenerationPage() {
       title: "Daily Report",
       description:
         "Generate a comprehensive daily summary of equipment status and alerts",
-      icon: Calendar,
+      icon: FaCalendarAlt,
     },
     {
       id: "weekly",
       title: "Weekly Report",
       description:
         "Get weekly insights on equipment usage, maintenance, and performance",
-      icon: Clock,
+      icon: FaClock,
     },
     {
       id: "monthly",
       title: "Monthly Report",
       description:
         "Detailed monthly analysis with trends, costs, and recommendations",
-      icon: FileText,
+      icon: FaFileAlt,
     },
   ];
 
@@ -108,12 +106,8 @@ export default function ReportGenerationPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Report Generation</h1>
-        {/* <p className="text-gray-600 mt-1">
-          Generate comprehensive reports for equipment monitoring and analysis
-        </p> */}
       </div>
 
-      {/* Message Banner */}
       {message.text && (
         <div
           className={`p-4 rounded-lg flex items-center gap-2 ${
@@ -123,15 +117,14 @@ export default function ReportGenerationPage() {
           }`}
         >
           {message.type === "success" ? (
-            <CheckCircle className="w-5 h-5" />
+            <FaCheckCircle className="w-5 h-5" />
           ) : (
-            <AlertCircle className="w-5 h-5" />
+            <FaExclamationCircle className="w-5 h-5" />
           )}
           <span>{message.text}</span>
         </div>
       )}
 
-      {/* Report Type Selection */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {reportTypes.map((type) => (
           <button
@@ -154,7 +147,6 @@ export default function ReportGenerationPage() {
         ))}
       </div>
 
-      {/* Report Generation Form */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
         <h2 className="text-xl font-semibold mb-4">
           Generate {reportType.charAt(0).toUpperCase() + reportType.slice(1)}{" "}
@@ -162,7 +154,6 @@ export default function ReportGenerationPage() {
         </h2>
 
         <form onSubmit={handleGenerateReport} className="space-y-4">
-          {/* Daily Report Fields */}
           {reportType === "daily" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -181,7 +172,6 @@ export default function ReportGenerationPage() {
             </div>
           )}
 
-          {/* Weekly Report Fields */}
           {reportType === "weekly" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -200,7 +190,6 @@ export default function ReportGenerationPage() {
             </div>
           )}
 
-          {/* Monthly Report Fields */}
           {reportType === "monthly" && (
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -251,7 +240,6 @@ export default function ReportGenerationPage() {
             </div>
           )}
 
-          {/* Generate Button */}
           <button
             type="submit"
             disabled={isLoading}
@@ -264,7 +252,7 @@ export default function ReportGenerationPage() {
               </>
             ) : (
               <>
-                <Download className="w-5 h-5" />
+                <FaDownload className="w-5 h-5" />
                 Generate Report
               </>
             )}
@@ -272,7 +260,6 @@ export default function ReportGenerationPage() {
         </form>
       </div>
 
-      {/* Report Information */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="font-medium text-blue-900 mb-2">
           Report Contents Include:

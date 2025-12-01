@@ -1,11 +1,17 @@
 /*
  * =====================================================
- * frontend/src/components/admin/InstituteManagerForm.jsx (FIXED)
+ * frontend/src/components/admin/InstituteManagerForm.jsx
  * =====================================================
  */
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Plus, Edit2, Trash2, AlertCircle } from "lucide-react";
+import { 
+  FaTimes, 
+  FaPlus, 
+  FaEdit, 
+  FaTrash, 
+  FaExclamationCircle 
+} from "react-icons/fa";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { useInstituteStore } from "../../stores/instituteStore";
 
@@ -25,21 +31,18 @@ export default function InstituteManagerForm({ isOpen, onClose }) {
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState("");
 
-  // Track if data has been fetched to prevent infinite loops
   const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     if (isOpen && !hasFetchedRef.current) {
-      fetchInstitutes(true); // Force fresh fetch
+      fetchInstitutes(true);
       hasFetchedRef.current = true;
       setError("");
     }
-
-    // Reset when modal closes
     if (!isOpen) {
       hasFetchedRef.current = false;
     }
-  }, [isOpen]); // Only depend on isOpen
+  }, [isOpen]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -106,7 +109,6 @@ export default function InstituteManagerForm({ isOpen, onClose }) {
 
   return createPortal(
     <div
-      // UPDATED: Changed bg-black bg-opacity-50 to bg-black/40 backdrop-blur-md
       className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all animate-in fade-in duration-200"
       onClick={onClose}
     >
@@ -114,7 +116,6 @@ export default function InstituteManagerForm({ isOpen, onClose }) {
         className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             Manage Institutes
@@ -123,19 +124,17 @@ export default function InstituteManagerForm({ isOpen, onClose }) {
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <X className="w-6 h-6" />
+            <FaTimes className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Error Display */}
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center gap-2 m-6 mb-0">
-            <AlertCircle className="w-5 h-5" />
+            <FaExclamationCircle className="w-5 h-5" />
             {error}
           </div>
         )}
 
-        {/* Create Form */}
         <form
           onSubmit={handleCreate}
           className="p-6 border-b border-gray-200 space-y-4"
@@ -176,11 +175,10 @@ export default function InstituteManagerForm({ isOpen, onClose }) {
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
             disabled={isLoading}
           >
-            <Plus className="w-5 h-5" /> Add New Institute
+            <FaPlus className="w-4 h-4" /> Add New Institute
           </button>
         </form>
 
-        {/* Institutes List */}
         <div className="p-6 overflow-y-auto flex-1 space-y-3">
           <h3 className="font-semibold text-gray-800">
             Existing Institutes ({institutes.length})
@@ -241,7 +239,7 @@ export default function InstituteManagerForm({ isOpen, onClose }) {
                         className="p-2 text-gray-500 hover:text-blue-700 hover:bg-blue-100 rounded-lg"
                         title="Edit Institute"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <FaEdit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(inst.instituteId)}
@@ -249,7 +247,7 @@ export default function InstituteManagerForm({ isOpen, onClose }) {
                         title="Delete Institute"
                         disabled={isLoading}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <FaTrash className="w-4 h-4" />
                       </button>
                     </>
                   )}

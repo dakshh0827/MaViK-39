@@ -5,13 +5,13 @@
  */
 import { useState } from "react";
 import {
-  Package,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  MessageSquare,
-} from "lucide-react";
+  FaBox,
+  FaClock,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaExclamationCircle,
+  FaCommentAlt,
+} from "react-icons/fa";
 
 const URGENCY_COLORS = {
   LOW: "bg-blue-100 text-blue-800 border-blue-200",
@@ -49,7 +49,7 @@ export default function ReorderRequestsList({ requests, onReview }) {
   if (requests.length === 0) {
     return (
       <div className="text-center py-12">
-        <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <FaBox className="w-16 h-16 text-gray-300 mx-auto mb-4" />
         <p className="text-gray-500 text-lg">No reorder requests</p>
       </div>
     );
@@ -61,7 +61,7 @@ export default function ReorderRequestsList({ requests, onReview }) {
       {pendingRequests.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-yellow-600" />
+            <FaClock className="w-5 h-5 text-yellow-600" />
             Pending Approval ({pendingRequests.length})
           </h3>
           <div className="space-y-4">
@@ -86,7 +86,7 @@ export default function ReorderRequestsList({ requests, onReview }) {
       {reviewedRequests.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
+            <FaCheckCircle className="w-5 h-5 text-green-600" />
             Reviewed Requests ({reviewedRequests.length})
           </h3>
           <div className="space-y-4">
@@ -123,7 +123,7 @@ function RequestCard({
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <AlertCircle className="w-5 h-5 text-red-500" />
+            <FaExclamationCircle className="w-5 h-5 text-red-500" />
             <h4 className="text-lg font-semibold text-gray-900">
               {equipment.name}
             </h4>
@@ -202,14 +202,14 @@ function RequestCard({
                   onClick={() => handleReview(request.id, "APPROVED")}
                   className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                 >
-                  <CheckCircle className="w-4 h-4" />
+                  <FaCheckCircle className="w-4 h-4" />
                   Approve
                 </button>
                 <button
                   onClick={() => handleReview(request.id, "REJECTED")}
                   className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
                 >
-                  <XCircle className="w-4 h-4" />
+                  <FaTimesCircle className="w-4 h-4" />
                   Reject
                 </button>
                 <button
@@ -255,7 +255,7 @@ function RequestCard({
           {request.reviewComments && (
             <div className="mt-2 bg-blue-50 p-3 rounded-lg">
               <div className="flex items-start gap-2">
-                <MessageSquare className="w-4 h-4 text-blue-600 mt-0.5" />
+                <FaCommentAlt className="w-4 h-4 text-blue-600 mt-0.5" />
                 <div>
                   <p className="text-xs font-medium text-blue-900 mb-1">
                     Comments:
