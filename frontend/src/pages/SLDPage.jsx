@@ -11,17 +11,17 @@ import { useInstituteStore } from "../stores/instituteStore";
 import { useSLDLayoutStore } from "../stores/sldLayoutStore";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import EquipmentNodeComponent from "../components/sld/EquipmentNode";
-import { 
-  FaFilter, 
-  FaExclamationCircle, 
-  FaEdit, 
-  FaSave, 
-  FaTimes, 
-  FaPlus, 
+import {
+  FaFilter,
+  FaExclamationCircle,
+  FaEdit,
+  FaSave,
+  FaTimes,
+  FaPlus,
   FaMinus,
   FaGripVertical,
   FaColumns,
-  FaMicroscope
+  FaMicroscope,
 } from "react-icons/fa";
 
 const DEPARTMENT_DISPLAY_NAMES = {
@@ -55,137 +55,161 @@ const ROW_HEIGHT = 160;
 export default function SLDPage() {
   const { user } = useAuthStore();
   const { labs, fetchLabs, isLoading: labsLoading } = useLabStore();
-  const { equipment, fetchEquipment, isLoading: equipmentLoading } = useEquipmentStore();
-  const { institutes, fetchInstitutes, isLoading: institutesLoading } = useInstituteStore();
-  const { fetchLayout, updateLayout, isLoading: layoutLoading } = useSLDLayoutStore();
+  const {
+    equipment,
+    fetchEquipment,
+    isLoading: equipmentLoading,
+  } = useEquipmentStore();
+  const {
+    institutes,
+    fetchInstitutes,
+    isLoading: institutesLoading,
+  } = useInstituteStore();
+  const {
+    fetchLayout,
+    updateLayout,
+    isLoading: layoutLoading,
+  } = useSLDLayoutStore();
 
   const [selectedInstitute, setSelectedInstitute] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [selectedLab, setSelectedLab] = useState("all");
   const [isInitialized, setIsInitialized] = useState(false);
-  
+
   const [numColumns, setNumColumns] = useState(3);
   const [isEditMode, setIsEditMode] = useState(false);
   const [equipmentPositions, setEquipmentPositions] = useState({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-// =========================================================
-// =========================================================
-// 1. TRAINER INITIALIZATION - Separate useEffect
-// =========================================================
-useEffect(() => {
-  const initializeTrainer = async () => {
-    if (!user || user.role !== "TRAINER") return;
-    
-    const trainerLabId = user.lab?.labId;
-    console.log("Trainer initialization - Lab ID:", trainerLabId);
-    
-    if (!trainerLabId) {
-      console.warn("Trainer has no lab assigned");
-      setIsInitialized(true);
+  // =========================================================
+  // =========================================================
+  // 1. TRAINER INITIALIZATION - Separate useEffect
+  // =========================================================
+  useEffect(() => {
+    const initializeTrainer = async () => {
+      if (!user || user.role !== "TRAINER") return;
+
+      const trainerLabId = user.lab?.labId;
+      console.log("Trainer initialization - Lab ID:", trainerLabId);
+
+      if (!trainerLabId) {
+        console.warn("Trainer has no lab assigned");
+        setIsInitialized(true);
+        return;
+      }
+
+      try {
+        setIsInitialized(false);
+
+        // Set the selected lab
+        setSelectedLab(trainerLabId);
+
+        // Fetch equipment
+        console.log("Fetching equipment for trainer lab:", trainerLabId);
+        await fetchEquipment({ labId: trainerLabId });
+
+        // Small delay to ensure equipment state is updated
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Fetch layout
+        console.log("Fetching layout for trainer lab:", trainerLabId);
+        const layout = await fetchLayout(trainerLabId);
+
+        if (
+          layout &&
+          layout.positions &&
+          Object.keys(layout.positions).length > 0
+        ) {
+          console.log("Layout loaded:", layout);
+          setEquipmentPositions(layout.positions);
+          setNumColumns(layout.numColumns || 4);
+        } else {
+          console.log("No saved layout, will use defaults");
+          setEquipmentPositions({});
+        }
+
+        setIsInitialized(true);
+        console.log("Trainer initialization complete");
+      } catch (error) {
+        console.error("Error initializing trainer data:", error);
+        setIsInitialized(true);
+      }
+    };
+
+    initializeTrainer();
+  }, [user]); // Only depend on user
+
+  // =========================================================
+  // 2. NON-TRAINER INITIALIZATION
+  // =========================================================
+  useEffect(() => {
+    const initializeOtherRoles = async () => {
+      if (!user || user.role === "TRAINER") return;
+
+      try {
+        if (user.role === "POLICY_MAKER") {
+          await fetchInstitutes();
+        }
+        await fetchLabs();
+      } catch (error) {
+        console.error("Failed to load filter data:", error);
+      }
+    };
+
+    initializeOtherRoles();
+  }, [user]);
+
+  // =========================================================
+  // 3. DATA FETCHING FOR NON-TRAINERS (Lab Selection Change)
+  // =========================================================
+  useEffect(() => {
+    // Skip if trainer or no specific lab selected
+    if (
+      !user ||
+      user.role === "TRAINER" ||
+      !selectedLab ||
+      selectedLab === "all"
+    ) {
       return;
     }
 
-    try {
-      setIsInitialized(false);
-      
-      // Set the selected lab
-      setSelectedLab(trainerLabId);
-      
-      // Fetch equipment
-      console.log("Fetching equipment for trainer lab:", trainerLabId);
-      await fetchEquipment({ labId: trainerLabId });
-      
-      // Small delay to ensure equipment state is updated
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Fetch layout
-      console.log("Fetching layout for trainer lab:", trainerLabId);
-      const layout = await fetchLayout(trainerLabId);
-      
-      if (layout && layout.positions && Object.keys(layout.positions).length > 0) {
-        console.log("Layout loaded:", layout);
-        setEquipmentPositions(layout.positions);
-        setNumColumns(layout.numColumns || 4);
-      } else {
-        console.log("No saved layout, will use defaults");
+    const fetchLabData = async () => {
+      try {
+        console.log("Fetching data for selected lab:", selectedLab);
+        await fetchEquipment({ labId: selectedLab });
+
+        const layout = await fetchLayout(selectedLab);
+        if (
+          layout &&
+          layout.positions &&
+          Object.keys(layout.positions).length > 0
+        ) {
+          setEquipmentPositions(layout.positions);
+          setNumColumns(layout.numColumns || 4);
+        } else {
+          setEquipmentPositions({});
+        }
+      } catch (error) {
+        console.error("Error fetching lab data:", error);
         setEquipmentPositions({});
       }
-      
-      setIsInitialized(true);
-      console.log("Trainer initialization complete");
-      
-    } catch (error) {
-      console.error("Error initializing trainer data:", error);
-      setIsInitialized(true);
-    }
-  };
+    };
 
-  initializeTrainer();
-}, [user]); // Only depend on user
+    fetchLabData();
+  }, [selectedLab]);
 
-// =========================================================
-// 2. NON-TRAINER INITIALIZATION
-// =========================================================
-useEffect(() => {
-  const initializeOtherRoles = async () => {
-    if (!user || user.role === "TRAINER") return;
-    
-    try {
-      if (user.role === "POLICY_MAKER") {
-        await fetchInstitutes();
-      }
-      await fetchLabs();
-    } catch (error) {
-      console.error("Failed to load filter data:", error);
-    }
-  };
+  // =========================================================
+  // 4. INITIALIZE DEFAULT POSITIONS WHEN EQUIPMENT LOADS
+  // =========================================================
+  useEffect(() => {
+    // Only initialize if we have equipment and no positions set
+    if (!equipment || equipment.length === 0) return;
+    if (Object.keys(equipmentPositions).length > 0) return;
 
-  initializeOtherRoles();
-}, [user]);
-
-// =========================================================
-// 3. DATA FETCHING FOR NON-TRAINERS (Lab Selection Change)
-// =========================================================
-useEffect(() => {
-  // Skip if trainer or no specific lab selected
-  if (!user || user.role === "TRAINER" || !selectedLab || selectedLab === "all") {
-    return;
-  }
-  
-  const fetchLabData = async () => {
-    try {
-      console.log("Fetching data for selected lab:", selectedLab);
-      await fetchEquipment({ labId: selectedLab });
-      
-      const layout = await fetchLayout(selectedLab);
-      if (layout && layout.positions && Object.keys(layout.positions).length > 0) {
-        setEquipmentPositions(layout.positions);
-        setNumColumns(layout.numColumns || 4);
-      } else {
-        setEquipmentPositions({});
-      }
-    } catch (error) {
-      console.error("Error fetching lab data:", error);
-      setEquipmentPositions({});
-    }
-  };
-
-  fetchLabData();
-}, [selectedLab]);
-
-// =========================================================
-// 4. INITIALIZE DEFAULT POSITIONS WHEN EQUIPMENT LOADS
-// =========================================================
-useEffect(() => {
-  // Only initialize if we have equipment and no positions set
-  if (!equipment || equipment.length === 0) return;
-  if (Object.keys(equipmentPositions).length > 0) return;
-  
-  console.log("Initializing default positions for equipment");
-  initializeDefaultPositions();
-}, [equipment]);
+    console.log("Initializing default positions for equipment");
+    initializeDefaultPositions();
+  }, [equipment]);
 
   // =========================================================
   // 3. COMPUTED VALUES (For Filters & Display)
@@ -194,15 +218,16 @@ useEffect(() => {
   // Name of the lab being viewed (for Header)
   const currentLabName = useMemo(() => {
     if (user.role === "TRAINER") return user.lab?.name || "Assigned Lab";
-    
-    const labObj = labs.find(l => l.labId === selectedLab);
+
+    const labObj = labs.find((l) => l.labId === selectedLab);
     return labObj ? labObj.name : "";
   }, [user, labs, selectedLab]);
 
   // Filter Logic (Only for Non-Trainers)
   const availableInstitutes = useMemo(() => {
     if (user.role === "POLICY_MAKER") return institutes;
-    if (user.role === "LAB_MANAGER") return institutes.filter(inst => inst.instituteId === user.instituteId);
+    if (user.role === "LAB_MANAGER")
+      return institutes.filter((inst) => inst.instituteId === user.instituteId);
     return [];
   }, [institutes, user]);
 
@@ -210,43 +235,52 @@ useEffect(() => {
     if (user.role === "LAB_MANAGER") return [user.department];
     let filteredLabs = labs;
     if (selectedInstitute !== "all") {
-      filteredLabs = labs.filter(lab => lab.instituteId === selectedInstitute);
+      filteredLabs = labs.filter(
+        (lab) => lab.instituteId === selectedInstitute
+      );
     }
-    return [...new Set(filteredLabs.map(lab => lab.department))].sort();
+    return [...new Set(filteredLabs.map((lab) => lab.department))].sort();
   }, [labs, selectedInstitute, user]);
 
   const availableLabs = useMemo(() => {
     let filteredLabs = labs;
     if (user.role === "LAB_MANAGER") {
       filteredLabs = labs.filter(
-        lab => lab.instituteId === user.instituteId && lab.department === user.department
+        (lab) =>
+          lab.instituteId === user.instituteId &&
+          lab.department === user.department
       );
     } else {
-      if (selectedInstitute !== "all") filteredLabs = filteredLabs.filter(lab => lab.instituteId === selectedInstitute);
-      if (selectedDepartment !== "all") filteredLabs = filteredLabs.filter(lab => lab.department === selectedDepartment);
+      if (selectedInstitute !== "all")
+        filteredLabs = filteredLabs.filter(
+          (lab) => lab.instituteId === selectedInstitute
+        );
+      if (selectedDepartment !== "all")
+        filteredLabs = filteredLabs.filter(
+          (lab) => lab.department === selectedDepartment
+        );
     }
     return filteredLabs;
   }, [labs, selectedInstitute, selectedDepartment, user]);
 
-
   // =========================================================
   // 4. LAYOUT & INTERACTION LOGIC
   // =========================================================
-const initializeDefaultPositions = () => {
-  if (!equipment || equipment.length === 0) return;
-  
-  const defaultPositions = {};
-  const cols = numColumns;
-  
-  equipment.forEach((eq, index) => {
-    const col = index % cols;
-    const row = Math.floor(index / cols);
-    defaultPositions[eq.id] = { column: col, row };
-  });
-  
-  console.log("Default positions created:", defaultPositions);
-  setEquipmentPositions(defaultPositions);
-};
+  const initializeDefaultPositions = () => {
+    if (!equipment || equipment.length === 0) return;
+
+    const defaultPositions = {};
+    const cols = numColumns;
+
+    equipment.forEach((eq, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      defaultPositions[eq.id] = { column: col, row };
+    });
+
+    console.log("Default positions created:", defaultPositions);
+    setEquipmentPositions(defaultPositions);
+  };
 
   const saveLayout = async () => {
     try {
@@ -266,16 +300,20 @@ const initializeDefaultPositions = () => {
   };
 
   const handlePositionChange = (equipmentId, newColumn, newRow) => {
-    setEquipmentPositions(prev => ({
+    setEquipmentPositions((prev) => ({
       ...prev,
-      [equipmentId]: { column: newColumn, row: newRow }
+      [equipmentId]: { column: newColumn, row: newRow },
     }));
     setHasUnsavedChanges(true);
   };
 
   const toggleEditMode = () => {
     if (isEditMode && hasUnsavedChanges) {
-      if (window.confirm("You have unsaved changes. Do you want to save before exiting?")) {
+      if (
+        window.confirm(
+          "You have unsaved changes. Do you want to save before exiting?"
+        )
+      ) {
         saveLayout();
       }
     }
@@ -286,36 +324,43 @@ const initializeDefaultPositions = () => {
     const newCols = Math.max(1, Math.min(8, numColumns + delta));
     setNumColumns(newCols);
     setHasUnsavedChanges(true);
-    
+
     // Recalculate positions based on new column count to keep order
     const updatedPositions = {};
     const equipmentIds = Object.keys(equipmentPositions);
-    
+
     const sortedEquipment = equipmentIds.sort((a, b) => {
       const posA = equipmentPositions[a];
       const posB = equipmentPositions[b];
       if (posA.row !== posB.row) return posA.row - posB.row;
       return posA.column - posB.column;
     });
-    
+
     sortedEquipment.forEach((eqId, index) => {
       const col = index % newCols;
       const row = Math.floor(index / newCols);
       updatedPositions[eqId] = { column: col, row };
     });
-    
+
     setEquipmentPositions(updatedPositions);
   };
 
   const getEdgeColor = (status) => {
     switch (status) {
-      case 'OPERATIONAL': return '#10B981';
-      case 'IN_USE': return '#3B82F6';
-      case 'IN_CLASS': return '#8B5CF6';
-      case 'MAINTENANCE': return '#F59E0B';
-      case 'FAULTY': return '#EF4444';
-      case 'WARNING': return '#F97316';
-      default: return '#CBD5E1';
+      case "OPERATIONAL":
+        return "#10B981";
+      case "IN_USE":
+        return "#3B82F6";
+      case "IN_CLASS":
+        return "#8B5CF6";
+      case "MAINTENANCE":
+        return "#F59E0B";
+      case "FAULTY":
+        return "#EF4444";
+      case "WARNING":
+        return "#F97316";
+      default:
+        return "#CBD5E1";
     }
   };
 
@@ -333,14 +378,14 @@ const initializeDefaultPositions = () => {
       }
     });
 
-    const maxRow = Math.max(...Object.values(positions).map(p => p.row), 0);
+    const maxRow = Math.max(...Object.values(positions).map((p) => p.row), 0);
     const totalWidth = numColumns * COLUMN_WIDTH;
     const totalHeight = (maxRow + 1) * ROW_HEIGHT;
 
     const rootX = (totalWidth - 280) / 2;
     const rootY = 0;
 
-    const nodes = equipment.map(eq => {
+    const nodes = equipment.map((eq) => {
       const pos = positions[eq.id] || { column: 0, row: 0 };
       const x = pos.column * COLUMN_WIDTH + (COLUMN_WIDTH - NODE_WIDTH) / 2;
       const y = rootY + 180 + pos.row * ROW_HEIGHT;
@@ -354,11 +399,11 @@ const initializeDefaultPositions = () => {
       };
     });
 
-    const connections = nodes.map(node => {
-      const startX = rootX + 140; 
-      const startY = rootY + 100; 
-      const endX = node.x + NODE_WIDTH / 2; 
-      const endY = node.y; 
+    const connections = nodes.map((node) => {
+      const startX = rootX + 140;
+      const startY = rootY + 100;
+      const endX = node.x + NODE_WIDTH / 2;
+      const endY = node.y;
 
       return {
         startX,
@@ -366,18 +411,19 @@ const initializeDefaultPositions = () => {
         endX,
         endY,
         color: getEdgeColor(node.equipment.status?.status),
-        animated: node.equipment.status?.status === 'IN_USE' || 
-                 node.equipment.status?.status === 'IN_CLASS',
+        animated:
+          node.equipment.status?.status === "IN_USE" ||
+          node.equipment.status?.status === "IN_CLASS",
       };
     });
 
-    return { 
-      nodes, 
-      connections, 
-      rootX, 
-      rootY, 
-      totalWidth, 
-      totalHeight: rootY + 180 + totalHeight 
+    return {
+      nodes,
+      connections,
+      rootX,
+      rootY,
+      totalWidth,
+      totalHeight: rootY + 180 + totalHeight,
     };
   };
 
@@ -397,16 +443,22 @@ const initializeDefaultPositions = () => {
 
   const handleLabChange = (e) => {
     if (isEditMode && hasUnsavedChanges) {
-      if (!window.confirm("You have unsaved changes. Are you sure you want to switch labs?")) return;
+      if (
+        !window.confirm(
+          "You have unsaved changes. Are you sure you want to switch labs?"
+        )
+      )
+        return;
     }
     setSelectedLab(e.target.value);
     setIsEditMode(false);
     setHasUnsavedChanges(false);
   };
 
-  const isLoading = user?.role === "TRAINER" 
-    ? !isInitialized 
-    : (labsLoading || equipmentLoading || institutesLoading || layoutLoading);
+  const isLoading =
+    user?.role === "TRAINER"
+      ? !isInitialized
+      : labsLoading || equipmentLoading || institutesLoading || layoutLoading;
   const canEdit = user.role === "LAB_MANAGER";
 
   return (
@@ -419,13 +471,16 @@ const initializeDefaultPositions = () => {
           </h1>
           {/* TRAINER VIEW: Static Lab Name */}
           {user.role === "TRAINER" && (
-             <p className="text-gray-500 mt-1 flex items-center gap-2 animate-fadeIn">
-               <FaMicroscope className="text-blue-500" />
-               Viewing: <span className="font-semibold text-gray-700">{currentLabName}</span>
-             </p>
+            <p className="text-gray-500 mt-1 flex items-center gap-2 animate-fadeIn">
+              <FaMicroscope className="text-blue-500" />
+              Viewing:{" "}
+              <span className="font-semibold text-gray-700">
+                {currentLabName}
+              </span>
+            </p>
           )}
         </div>
-        
+
         {/* ACTION BUTTONS (Only for Managers) */}
         {canEdit && selectedLab !== "all" && equipment.length > 0 && (
           <div className="flex gap-2">
@@ -524,7 +579,9 @@ const initializeDefaultPositions = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FaColumns className="w-5 h-5 text-blue-600" />
-              <span className="font-semibold text-gray-900">Layout Columns: {numColumns}</span>
+              <span className="font-semibold text-gray-900">
+                Layout Columns: {numColumns}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -544,7 +601,8 @@ const initializeDefaultPositions = () => {
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            Click on equipment badges (C# R#) to change their position in the flowchart
+            Click on equipment badges (C# R#) to change their position in the
+            flowchart
           </p>
           {hasUnsavedChanges && (
             <p className="text-sm text-amber-600 mt-1 font-medium">
@@ -571,42 +629,48 @@ const initializeDefaultPositions = () => {
 
       {/* CANVAS / DIAGRAM AREA */}
       <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-sm border border-gray-200 p-8 overflow-auto">
-      {isLoading ? (
-        <div className="flex justify-center items-center min-h-[600px]">
-          <LoadingSpinner size="lg" />
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center items-center min-h-[600px]">
+            <LoadingSpinner size="lg" />
+          </div>
         ) : user?.role === "TRAINER" && !user?.lab?.labId ? (
-        <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500">
-          <FaExclamationCircle className="w-16 h-16 text-red-300 mb-4" />
-          <p className="text-lg">No Lab Assigned</p>
-          <p className="text-sm text-gray-400 mt-2">Please contact your administrator.</p>
-        </div>
+          <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500">
+            <FaExclamationCircle className="w-16 h-16 text-red-300 mb-4" />
+            <p className="text-lg">No Lab Assigned</p>
+            <p className="text-sm text-gray-400 mt-2">
+              Please contact your administrator.
+            </p>
+          </div>
         ) : selectedLab === "all" ? (
-        <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500">
-          <FaExclamationCircle className="w-16 h-16 text-gray-300 mb-4" />
-          <p className="text-lg">Please select a lab to view equipment layout</p>
-        </div>
+          <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500">
+            <FaExclamationCircle className="w-16 h-16 text-gray-300 mb-4" />
+            <p className="text-lg">
+              Please select a lab to view equipment layout
+            </p>
+          </div>
         ) : equipment.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500">
-          <FaExclamationCircle className="w-16 h-16 text-gray-300 mb-4" />
-          <p className="text-lg">No equipment found in this lab</p>
-          <p className="text-sm text-gray-400 mt-2">
-            {user?.role === "TRAINER" ? "Your lab has no equipment registered yet." : "Try selecting a different lab"}
-          </p>
-        </div>
+          <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500">
+            <FaExclamationCircle className="w-16 h-16 text-gray-300 mb-4" />
+            <p className="text-lg">No equipment found in this lab</p>
+            <p className="text-sm text-gray-400 mt-2">
+              {user?.role === "TRAINER"
+                ? "Your lab has no equipment registered yet."
+                : "Try selecting a different lab"}
+            </p>
+          </div>
         ) : (
-          <div 
-            className="relative mx-auto" 
-            style={{ 
+          <div
+            className="relative mx-auto"
+            style={{
               width: `${layout.totalWidth + 100}px`,
-              minHeight: `${layout.totalHeight + 100}px`
+              minHeight: `${layout.totalHeight + 100}px`,
             }}
           >
             {/* GRID LINES (Edit Mode) */}
             {isEditMode && (
               <svg
                 className="absolute top-0 left-0 pointer-events-none"
-                style={{ width: '100%', height: '100%' }}
+                style={{ width: "100%", height: "100%" }}
               >
                 {Array.from({ length: numColumns }).map((_, i) => {
                   const x = i * COLUMN_WIDTH + COLUMN_WIDTH / 2 + 50;
@@ -638,9 +702,9 @@ const initializeDefaultPositions = () => {
             )}
 
             {/* ROOT NODE (Lab Name) */}
-            <div 
+            <div
               className="absolute"
-              style={{ 
+              style={{
                 left: `${layout.rootX + 50}px`,
                 top: `${layout.rootY + 50}px`,
               }}
@@ -658,9 +722,9 @@ const initializeDefaultPositions = () => {
             </div>
 
             {/* CONNECTION LINES */}
-            <svg 
+            <svg
               className="absolute pointer-events-none"
-              style={{ width: '100%', height: '100%', top: 0, left: 0 }}
+              style={{ width: "100%", height: "100%", top: 0, left: 0 }}
             >
               <defs>
                 {layout.connections.map((conn, index) => (
@@ -715,6 +779,9 @@ const initializeDefaultPositions = () => {
   );
 }
 
+// ... (keep all existing imports and the main SLDPage component unchanged)
+
+// Scroll down to the helper component at the bottom of the file to apply the fix
 function EquipmentNode({ node, isEditMode, numColumns, onPositionChange }) {
   const [showPositionPicker, setShowPositionPicker] = useState(false);
   const [tempColumn, setTempColumn] = useState(node.column);
@@ -749,24 +816,25 @@ function EquipmentNode({ node, isEditMode, numColumns, onPositionChange }) {
     >
       <div className="relative">
         {isEditMode && (
-          <div 
+          <div
             className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-2 py-1 rounded text-xs cursor-pointer hover:bg-blue-700 flex items-center gap-1 shadow-md z-10"
             onClick={handleBadgeClick}
           >
-            <FaGripVertical className="w-3 h-3" />
-            C{node.column + 1} R{node.row + 1}
+            <FaGripVertical className="w-3 h-3" />C{node.column + 1} R
+            {node.row + 1}
           </div>
         )}
-        
+
         <EquipmentNodeComponent data={{ equipment: node.equipment }} />
 
         {showPositionPicker && (
-          <div 
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-50"
+          <div
+            // UPDATED FIX: Using 'bg-black/40' combined syntax for reliable translucency
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
             onClick={() => setShowPositionPicker(false)}
           >
-            <div 
-              className="bg-white rounded-lg shadow-2xl border-2 border-blue-500 p-6 w-80"
+            <div
+              className="bg-white rounded-lg shadow-2xl p-6 w-80 animate-fadeIn"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-4">
@@ -778,7 +846,7 @@ function EquipmentNode({ node, isEditMode, numColumns, onPositionChange }) {
                   <FaTimes className="w-5 h-5" />
                 </button>
               </div>
-              
+
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-2">
                   {node.equipment.name}
@@ -796,14 +864,16 @@ function EquipmentNode({ node, isEditMode, numColumns, onPositionChange }) {
                   <select
                     value={tempColumn}
                     onChange={(e) => setTempColumn(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     {Array.from({ length: numColumns }, (_, i) => (
-                      <option key={i} value={i}>Column {i + 1}</option>
+                      <option key={i} value={i}>
+                        Column {i + 1}
+                      </option>
                     ))}
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Row
@@ -814,13 +884,13 @@ function EquipmentNode({ node, isEditMode, numColumns, onPositionChange }) {
                     max="20"
                     value={tempRow}
                     onChange={(e) => setTempRow(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
 
                 <button
                   onClick={handleApplyPosition}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
                 >
                   Apply Position
                 </button>

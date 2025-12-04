@@ -603,11 +603,11 @@ export default function PolicyMakerDashboard() {
       bg: "bg-emerald-50",
     },
     {
-      icon: FaBox,
-      title: "Items in Stock",
-      value: pagination.total || 0,
-      color: "text-purple-600",
-      bg: "bg-purple-50",
+      icon: FaExclamationTriangle,
+      title: "Unresolved Alerts",
+      value: activeAlerts.length || 0,
+      color: "text-red-600",
+      bg: "bg-red-50",
     },
   ];
 
@@ -1184,7 +1184,8 @@ export default function PolicyMakerDashboard() {
                           <LoadingSpinner size="sm" color="white" />
                         ) : (
                           <>
-                            <FaCheckCircle className="w-4 h-4" /> Approve Request
+                            <FaCheckCircle className="w-4 h-4" /> Approve
+                            Request
                           </>
                         )}
                       </button>

@@ -1,8 +1,3 @@
-/*
- * =====================================================
- * frontend/src/components/breakdown/ReorderModal.jsx
- * =====================================================
- */
 import { useState } from "react";
 import { FaTimes, FaBox } from "react-icons/fa";
 
@@ -11,7 +6,7 @@ export default function ReorderModal({ isOpen, onClose, breakdown, onSubmit }) {
     quantity: 1,
     urgency: "MEDIUM",
     reason: "",
-    estimatedCost: "",
+    // REMOVED: estimatedCost state
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -47,8 +42,16 @@ export default function ReorderModal({ isOpen, onClose, breakdown, onSubmit }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4"
+      // ADDED: Click handler on the backdrop to close modal
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        // ADDED: Stop propagation prevents clicks inside the modal from bubbling up and closing it
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -162,22 +165,7 @@ export default function ReorderModal({ isOpen, onClose, breakdown, onSubmit }) {
             />
           </div>
 
-          {/* Estimated Cost */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Cost (Optional)
-            </label>
-            <input
-              type="number"
-              name="estimatedCost"
-              value={formData.estimatedCost}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              placeholder="Enter estimated cost in ₹"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+          {/* REMOVED: Estimated Cost Input Block */}
 
           {/* Actions */}
           <div className="flex items-center gap-3 pt-4">

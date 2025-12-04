@@ -27,7 +27,7 @@ import {
   FaUserCheck,
   FaCheck,
   FaTimes,
-  FaExternalLinkAlt
+  FaExternalLinkAlt,
 } from "react-icons/fa";
 import { ImLab } from "react-icons/im";
 
@@ -450,18 +450,18 @@ export default function LabManagerDashboard() {
       bg: "bg-emerald-50",
     },
     {
-      icon: FaExclamationTriangle,
-      title: "Unresolved Alerts",
-      value: overview?.overview?.unresolvedAlerts || 0,
-      color: "text-red-600",
-      bg: "bg-red-50",
-    },
-    {
       icon: FaWrench,
       title: "Maintenance Due",
       value: overview?.overview?.maintenanceDue || 0,
       color: "text-orange-600",
       bg: "bg-orange-50",
+    },
+    {
+      icon: FaExclamationTriangle,
+      title: "Unresolved Alerts",
+      value: overview?.overview?.unresolvedAlerts || 0,
+      color: "text-red-600",
+      bg: "bg-red-50",
     },
   ];
 

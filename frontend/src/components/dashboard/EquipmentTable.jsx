@@ -4,76 +4,76 @@
  * =====================================================
  */
 import { useState } from "react";
-import { 
-  FaEdit, 
-  FaTrash, 
-  FaEye, 
+import {
+  FaEdit,
+  FaTrash,
+  FaEye,
   FaEllipsisV,
   FaExclamationCircle,
   FaCheckCircle,
   FaClock,
-  FaTimesCircle 
+  FaTimesCircle,
 } from "react-icons/fa";
 import { FaCirclePause } from "react-icons/fa6";
 
 const STATUS_CONFIG = {
-  OPERATIONAL: { 
-    color: "bg-green-100 text-green-800", 
+  OPERATIONAL: {
+    color: "bg-green-100 text-green-800",
     icon: FaCheckCircle,
-    label: "Operational" 
+    label: "Operational",
   },
-  IN_USE: { 
-    color: "bg-blue-100 text-blue-800", 
+  IN_USE: {
+    color: "bg-blue-100 text-blue-800",
     icon: FaClock,
-    label: "In Use" 
+    label: "In Use",
   },
-  IN_CLASS: { 
-    color: "bg-blue-100 text-blue-800", 
+  IN_CLASS: {
+    color: "bg-blue-100 text-blue-800",
     icon: FaClock,
-    label: "In Class" 
+    label: "In Class",
   },
-  IDLE: { 
-    color: "bg-gray-100 text-gray-800", 
+  IDLE: {
+    color: "bg-gray-100 text-gray-800",
     icon: FaCirclePause,
-    label: "Idle" 
+    label: "Idle",
   },
-  MAINTENANCE: { 
-    color: "bg-amber-100 text-amber-800", 
+  MAINTENANCE: {
+    color: "bg-amber-100 text-amber-800",
     icon: FaExclamationCircle,
-    label: "Maintenance" 
+    label: "Maintenance",
   },
-  FAULTY: { 
-    color: "bg-red-100 text-red-800", 
+  FAULTY: {
+    color: "bg-red-100 text-red-800",
     icon: FaTimesCircle,
-    label: "Faulty" 
+    label: "Faulty",
   },
-  OFFLINE: { 
-    color: "bg-gray-100 text-gray-800", 
+  OFFLINE: {
+    color: "bg-gray-100 text-gray-800",
     icon: FaTimesCircle,
-    label: "Offline" 
+    label: "Offline",
   },
-  WARNING: { 
-    color: "bg-orange-100 text-orange-800", 
+  WARNING: {
+    color: "bg-orange-100 text-orange-800",
     icon: FaExclamationCircle,
-    label: "Warning" 
+    label: "Warning",
   },
 };
 
 const getInstituteName = (institute) => {
   if (!institute) return "";
-  if (typeof institute === 'string') return institute;
-  if (typeof institute === 'object') {
+  if (typeof institute === "string") return institute;
+  if (typeof institute === "object") {
     return institute.name || institute.instituteId || "";
   }
   return "";
 };
 
-export default function EquipmentTable({ 
-  equipment = [], 
-  onEdit, 
-  onDelete, 
+export default function EquipmentTable({
+  equipment = [],
+  onEdit,
+  onDelete,
   onView,
-  showActions = false 
+  showActions = false,
 }) {
   const [activeMenu, setActiveMenu] = useState(null);
 
@@ -83,11 +83,11 @@ export default function EquipmentTable({
 
   const handleAction = (action, item) => {
     setActiveMenu(null);
-    if (action === 'edit' && onEdit) {
+    if (action === "edit" && onEdit) {
       onEdit(item);
-    } else if (action === 'delete' && onDelete) {
+    } else if (action === "delete" && onDelete) {
       onDelete(item.id);
-    } else if (action === 'view' && onView) {
+    } else if (action === "view" && onView) {
       onView(item);
     }
   };
@@ -109,9 +109,7 @@ export default function EquipmentTable({
 
   if (equipment.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        No equipment found
-      </div>
+      <div className="text-center py-8 text-gray-500">No equipment found</div>
     );
   }
 
@@ -153,15 +151,10 @@ export default function EquipmentTable({
             const healthScore = item.status?.healthScore || 0;
 
             return (
-              <tr 
-                key={item.id} 
-                className="hover:bg-gray-50 transition-colors"
-              >
+              <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-4">
                   <div>
-                    <div className="font-medium text-gray-900">
-                      {item.name}
-                    </div>
+                    <div className="font-medium text-gray-900">{item.name}</div>
                     <div className="text-sm text-gray-500">
                       {item.equipmentId}
                     </div>
@@ -170,7 +163,9 @@ export default function EquipmentTable({
 
                 <td className="px-4 py-4">
                   <div className="text-sm">
-                    <div className="text-gray-900">{item.lab?.name || "N/A"}</div>
+                    <div className="text-gray-900">
+                      {item.lab?.name || "N/A"}
+                    </div>
                     <div className="text-gray-500 text-xs">
                       {getInstituteName(item.lab?.institute)}
                     </div>
@@ -220,51 +215,33 @@ export default function EquipmentTable({
                 </td>
 
                 {showActions && (
-                  <td className="px-4 py-4 text-right relative">
-                    <button
-                      onClick={() => handleMenuToggle(item.id)}
-                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                    >
-                      <FaEllipsisV className="w-4 h-4 text-gray-600" />
-                    </button>
-
-                    {activeMenu === item.id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setActiveMenu(null)}
-                        />
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                          {onView && (
-                            <button
-                              onClick={() => handleAction('view', item)}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <FaEye className="w-4 h-4" />
-                              View Details
-                            </button>
-                          )}
-                          {onEdit && (
-                            <button
-                              onClick={() => handleAction('edit', item)}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <FaEdit className="w-4 h-4" />
-                              Edit
-                            </button>
-                          )}
-                          {onDelete && (
-                            <button
-                              onClick={() => handleAction('delete', item)}
-                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                            >
-                              <FaTrash className="w-4 h-4" />
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </>
-                    )}
+                  <td className="px-4 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {onEdit && (
+                        <button
+                          onClick={() => onEdit(item)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        >
+                          <FaEdit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          onClick={() => onDelete(item.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <FaTrash className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onView && (
+                        <button
+                          onClick={() => onView(item)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        >
+                          <FaEye className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>

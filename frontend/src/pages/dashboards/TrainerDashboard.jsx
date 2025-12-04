@@ -19,7 +19,7 @@ import {
   FaCheckCircle,
   FaTimesCircle,
   FaPlayCircle,
-  FaExclamationCircle
+  FaExclamationCircle,
 } from "react-icons/fa";
 import { FaCirclePause } from "react-icons/fa6";
 import { ImLab } from "react-icons/im";
@@ -30,11 +30,11 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
   const chartData = useMemo(() => {
     const today = new Date();
     const months = [];
-    
+
     // 1. Generate Last 6 Months Labels
     for (let i = 5; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      months.push(d.toLocaleString('default', { month: 'short' }));
+      months.push(d.toLocaleString("default", { month: "short" }));
     }
 
     const safeScore = currentScore || 0;
@@ -50,7 +50,7 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
       // Logic: Create a random variance between -10 and +10 of the current score
       const variance = Math.floor(Math.random() * 20) - 10;
       const calculatedScore = Math.max(0, Math.min(100, safeScore + variance));
-      
+
       return { month: m, score: calculatedScore };
     });
   }, [currentScore]);
@@ -62,20 +62,26 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
   const maxScore = 100;
 
   // Helper to map data to SVG coordinates
-  const getX = (index) => padding + (index / (chartData.length - 1)) * (width - 2 * padding);
-  const getY = (score) => height - padding - (score / maxScore) * (height - 2 * padding);
+  const getX = (index) =>
+    padding + (index / (chartData.length - 1)) * (width - 2 * padding);
+  const getY = (score) =>
+    height - padding - (score / maxScore) * (height - 2 * padding);
 
   // Generate Path Strings
-  const points = chartData.map((d, i) => `${getX(i)},${getY(d.score)}`).join(" ");
-  const areaPoints = `${getX(0)},${height - padding} ${points} ${getX(chartData.length - 1)},${height - padding}`;
+  const points = chartData
+    .map((d, i) => `${getX(i)},${getY(d.score)}`)
+    .join(" ");
+  const areaPoints = `${getX(0)},${height - padding} ${points} ${getX(
+    chartData.length - 1
+  )},${height - padding}`;
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden">
       <div className="relative w-full h-full">
-        <svg 
-            viewBox={`0 0 ${width} ${height}`} 
-            className="w-full h-full"
-            preserveAspectRatio="none"
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-full"
+          preserveAspectRatio="none"
         >
           <defs>
             <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
@@ -85,62 +91,89 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
           </defs>
 
           {/* Grid Lines */}
-          <line x1={padding} y1={getY(0)} x2={width - padding} y2={getY(0)} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4" vectorEffect="non-scaling-stroke" />
-          <line x1={padding} y1={getY(50)} x2={width - padding} y2={getY(50)} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4" vectorEffect="non-scaling-stroke" />
-          <line x1={padding} y1={getY(100)} x2={width - padding} y2={getY(100)} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4" vectorEffect="non-scaling-stroke" />
+          <line
+            x1={padding}
+            y1={getY(0)}
+            x2={width - padding}
+            y2={getY(0)}
+            stroke="#e5e7eb"
+            strokeWidth="1"
+            strokeDasharray="4"
+            vectorEffect="non-scaling-stroke"
+          />
+          <line
+            x1={padding}
+            y1={getY(50)}
+            x2={width - padding}
+            y2={getY(50)}
+            stroke="#e5e7eb"
+            strokeWidth="1"
+            strokeDasharray="4"
+            vectorEffect="non-scaling-stroke"
+          />
+          <line
+            x1={padding}
+            y1={getY(100)}
+            x2={width - padding}
+            y2={getY(100)}
+            stroke="#e5e7eb"
+            strokeWidth="1"
+            strokeDasharray="4"
+            vectorEffect="non-scaling-stroke"
+          />
 
           {/* Area Fill */}
           <polygon points={areaPoints} fill="url(#scoreGradient)" />
 
           {/* Line */}
-          <polyline 
-            points={points} 
-            fill="none" 
-            stroke="#10b981" 
-            strokeWidth="3" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            vectorEffect="non-scaling-stroke" 
+          <polyline
+            points={points}
+            fill="none"
+            stroke="#10b981"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
           />
 
           {/* Data Points & Labels */}
           {chartData.map((d, i) => (
             <g key={i}>
-                {/* Dot */}
-                <circle
-                  cx={getX(i)}
-                  cy={getY(d.score)}
-                  r="4"
-                  fill="white"
-                  stroke="#10b981"
-                  strokeWidth="2"
-                  vectorEffect="non-scaling-stroke"
-                />
-                
-                {/* Score Value (Floating above dot) */}
-                <text
-                  x={getX(i)}
-                  y={getY(d.score) - 10}
-                  textAnchor="middle"
-                  fontSize="7" 
-                  fill="#10b981"
-                  fontWeight="bold"
-                >
-                  {d.score}%
-                </text>
+              {/* Dot */}
+              <circle
+                cx={getX(i)}
+                cy={getY(d.score)}
+                r="4"
+                fill="white"
+                stroke="#10b981"
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+              />
 
-                {/* Month Name (X-Axis) - Font Size reduced to 7px */}
-                <text
-                  x={getX(i)}
-                  y={height - 2}
-                  textAnchor="middle"
-                  fontSize="7" 
-                  fill="#9ca3af"
-                  fontWeight="600"
-                  style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                >
-                  {d.month}
-                </text>
+              {/* Score Value (Floating above dot) */}
+              <text
+                x={getX(i)}
+                y={getY(d.score) - 10}
+                textAnchor="middle"
+                fontSize="7"
+                fill="#10b981"
+                fontWeight="bold"
+              >
+                {d.score}%
+              </text>
+
+              {/* Month Name (X-Axis) - Font Size reduced to 7px */}
+              <text
+                x={getX(i)}
+                y={height - 2}
+                textAnchor="middle"
+                fontSize="7"
+                fill="#9ca3af"
+                fontWeight="600"
+                style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}
+              >
+                {d.month}
+              </text>
             </g>
           ))}
         </svg>
@@ -296,25 +329,39 @@ export default function TrainerDashboard() {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case "OPERATIONAL": return <FaCheckCircle className="w-4 h-4 text-green-600" />;
-      case "FAULTY": return <FaTimesCircle className="w-4 h-4 text-red-600" />;
-      case "MAINTENANCE": return <FaWrench className="w-4 h-4 text-amber-600" />;
-      case "IN_CLASS": return <FaClock className="w-4 h-4 text-blue-600" />;
-      case "IDLE": return <FaCirclePause className="w-4 h-4 text-gray-600" />;
-      case "WARNING": return <FaExclamationCircle className="w-4 h-4 text-orange-600" />;
-      default: return <FaChartLine className="w-4 h-4 text-gray-600" />;
+      case "OPERATIONAL":
+        return <FaCheckCircle className="w-4 h-4 text-green-600" />;
+      case "FAULTY":
+        return <FaTimesCircle className="w-4 h-4 text-red-600" />;
+      case "MAINTENANCE":
+        return <FaWrench className="w-4 h-4 text-amber-600" />;
+      case "IN_CLASS":
+        return <FaClock className="w-4 h-4 text-blue-600" />;
+      case "IDLE":
+        return <FaCirclePause className="w-4 h-4 text-gray-600" />;
+      case "WARNING":
+        return <FaExclamationCircle className="w-4 h-4 text-orange-600" />;
+      default:
+        return <FaChartLine className="w-4 h-4 text-gray-600" />;
     }
   };
 
   const getStatusBg = (status) => {
     switch (status) {
-      case "OPERATIONAL": return "bg-green-100 border-green-100";
-      case "FAULTY": return "bg-red-100 border-red-100";
-      case "MAINTENANCE": return "bg-amber-100 border-amber-100";
-      case "IN_CLASS": return "bg-blue-100 border-blue-100";
-      case "IDLE": return "bg-gray-100 border-gray-100";
-      case "WARNING": return "bg-orange-100 border-orange-100";
-      default: return "bg-gray-100 border-gray-100";
+      case "OPERATIONAL":
+        return "bg-green-100 border-green-100";
+      case "FAULTY":
+        return "bg-red-100 border-red-100";
+      case "MAINTENANCE":
+        return "bg-amber-100 border-amber-100";
+      case "IN_CLASS":
+        return "bg-blue-100 border-blue-100";
+      case "IDLE":
+        return "bg-gray-100 border-gray-100";
+      case "WARNING":
+        return "bg-orange-100 border-orange-100";
+      default:
+        return "bg-gray-100 border-gray-100";
     }
   };
 
@@ -342,27 +389,25 @@ export default function TrainerDashboard() {
       bg: "bg-emerald-50",
     },
     {
-      icon: FaExclamationTriangle,
-      title: "Unresolved Alerts",
-      value: overview?.overview?.unresolvedAlerts || 0,
-      color: "text-red-600",
-      bg: "bg-red-50",
-    },
-    {
       icon: FaWrench,
       title: "Maintenance Due",
       value: overview?.overview?.maintenanceDue || 0,
       color: "text-orange-600",
       bg: "bg-orange-50",
     },
+    {
+      icon: FaExclamationTriangle,
+      title: "Unresolved Alerts",
+      value: overview?.overview?.unresolvedAlerts || 0,
+      color: "text-red-600",
+      bg: "bg-red-50",
+    },
   ];
 
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col bg-gray-50 overflow-hidden p-1 gap-4 w-full">
-      
       {/* --- ROW 1: 40% Height --- */}
       <div className="flex-none h-[40%] grid grid-cols-12 gap-4 min-h-0">
-        
         {/* Left: Stats Grid (25% Width) */}
         <div className="col-span-12 lg:col-span-3 h-full grid grid-cols-2 gap-3">
           {stats.map((stat, index) => {
@@ -400,54 +445,64 @@ export default function TrainerDashboard() {
               </h2>
             </div>
             <div className="text-xs text-gray-500 font-medium">
-               {user?.lab?.name || "Assigned Lab"}
+              {user?.lab?.name || "Assigned Lab"}
             </div>
           </div>
 
           <div className="flex-1 w-full p-4 flex gap-6 overflow-hidden">
-            
             {/* Left: Chart Section */}
             <div className="flex-[4] flex flex-col h-full bg-white rounded-xl border border-gray-100 p-3 relative shadow-md">
-                <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-xs font-bold text-gray-700">Health Trend</h3>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-gray-400">Avg Score:</span>
-                        <span className={`text-sm font-bold ${
-                             overview?.overview?.avgHealthScore >= 80 ? "text-emerald-600" : "text-yellow-600"
-                        }`}>
-                            {overview?.overview?.avgHealthScore || 0}%
-                        </span>
-                    </div>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-xs font-bold text-gray-700">
+                  Health Trend
+                </h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-gray-400">Avg Score:</span>
+                  <span
+                    className={`text-sm font-bold ${
+                      overview?.overview?.avgHealthScore >= 80
+                        ? "text-emerald-600"
+                        : "text-yellow-600"
+                    }`}
+                  >
+                    {overview?.overview?.avgHealthScore || 0}%
+                  </span>
                 </div>
-                <div className="flex-1 min-h-0 w-full">
-                    {/* UPDATED: Pass the single average score, component simulates history */}
-                    <HealthHistoryChart 
-                        currentScore={overview?.overview?.avgHealthScore} 
-                    />
-                </div>
+              </div>
+              <div className="flex-1 min-h-0 w-full">
+                {/* UPDATED: Pass the single average score, component simulates history */}
+                <HealthHistoryChart
+                  currentScore={overview?.overview?.avgHealthScore}
+                />
+              </div>
             </div>
 
             {/* Right: Vertical Distribution List */}
             <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1 min-w-[200px]">
-               <h3 className="text-xs font-bold text-gray-700 mb-1 sticky top-0 bg-white">Distribution</h3>
-               {overview?.equipmentByStatus && overview.equipmentByStatus.map((item) => (
-                  <div 
-                    key={item.status} 
-                    className={`flex items-center justify-between p-2.5 rounded-lg border ${getStatusBg(item.status)}`}
+              <h3 className="text-xs font-bold text-gray-700 mb-1 sticky top-0 bg-white">
+                Distribution
+              </h3>
+              {overview?.equipmentByStatus &&
+                overview.equipmentByStatus.map((item) => (
+                  <div
+                    key={item.status}
+                    className={`flex items-center justify-between p-2.5 rounded-lg border ${getStatusBg(
+                      item.status
+                    )}`}
                   >
                     <div className="flex items-center gap-2.5">
-                        <div className="p-1 bg-white rounded-full shadow-md">
-                           {getStatusIcon(item.status)}
-                        </div>
-                        <div className="text-[11px] font-bold text-gray-700 uppercase tracking-wide">
-                           {item.status.replace(/_/g, " ")}
-                        </div>
+                      <div className="p-1 bg-white rounded-full shadow-md">
+                        {getStatusIcon(item.status)}
+                      </div>
+                      <div className="text-[11px] font-bold text-gray-700 uppercase tracking-wide">
+                        {item.status.replace(/_/g, " ")}
+                      </div>
                     </div>
                     <span className="text-lg font-bold text-gray-800">
-                        {item.count}
+                      {item.count}
                     </span>
                   </div>
-               ))}
+                ))}
             </div>
           </div>
         </div>
@@ -455,20 +510,21 @@ export default function TrainerDashboard() {
 
       {/* --- ROW 2: 60% Height (Table & Alerts) --- */}
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-4">
-        
         {/* Left: Main Equipment Table */}
         <div className="col-span-12 lg:col-span-9 h-full bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col min-h-0">
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-100 bg-white flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                    <ImLab className="w-4 h-4" />
-                </div>
-                <div>
-                    <h2 className="text-sm font-bold text-gray-800">Lab Equipment</h2>
-                    <p className="text-[10px] text-gray-500 font-medium">
-                        {filteredEquipment.length} items listed
-                    </p>
-                </div>
+              <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                <ImLab className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-gray-800">
+                  Lab Equipment
+                </h2>
+                <p className="text-[10px] text-gray-500 font-medium">
+                  {filteredEquipment.length} items listed
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-3 flex-1 justify-end">
@@ -528,7 +584,7 @@ export default function TrainerDashboard() {
               </div>
               <h2 className="text-sm font-bold text-gray-800">Alerts</h2>
             </div>
-            
+
             <div className="flex bg-gray-100 p-0.5 rounded-lg">
               <button
                 onClick={() => handleTabChange("active")}
