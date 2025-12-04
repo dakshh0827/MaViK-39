@@ -380,7 +380,7 @@ export default function TrainerDashboard() {
                     {stat.value}
                   </div>
                 </div>
-                <div className="mt-1 w-full text-center text-xs font-semibold text-gray-500 uppercase tracking-wide truncate">
+                <div className="mt-1 w-full text-center text-wrap text-xs font-semibold text-gray-500 uppercase tracking-wide truncate">
                   {stat.title}
                 </div>
               </div>
