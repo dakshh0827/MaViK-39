@@ -16,11 +16,24 @@ import { useBreakdownStore } from "../../stores/breakdownStore";
 import BreakdownEquipmentTable from "../../components/breakdown/BreakdownEquipmentTable";
 import AddBreakdownModal from "../../components/breakdown/AddBreakdownModal";
 import BreakdownAlertModal from "../../components/breakdown/BreakdownAlertModal";
+import AlertModal from "../../components/dashboard/AlertModal";
 import {
-  FaChartLine, FaExclamationTriangle, FaWrench, FaArrowUp, FaBuilding,
-  FaDownload, FaSearch, FaCheckCircle, FaChevronDown, FaClock,
-  FaUserCheck, FaCheck, FaTimes, FaExternalLinkAlt, FaPlus,
-  FaWifi
+  FaChartLine,
+  FaExclamationTriangle,
+  FaWrench,
+  FaArrowUp,
+  FaBuilding,
+  FaDownload,
+  FaSearch,
+  FaCheckCircle,
+  FaChevronDown,
+  FaClock,
+  FaUserCheck,
+  FaCheck,
+  FaTimes,
+  FaExternalLinkAlt,
+  FaPlus,
+  FaWifi,
 } from "react-icons/fa";
 import { ImLab } from "react-icons/im";
 import { MdOutlineWifiOff } from "react-icons/md";
@@ -65,7 +78,7 @@ const ModalWrapper = ({ children, onClose }) => {
   );
 };
 
-const CompactHistoryList = ({ alerts, loading }) => {
+const CompactHistoryList = ({ alerts, loading, onAlertClick }) => {
   if (loading)
     return (
       <div className="flex justify-center py-4">
@@ -80,60 +93,46 @@ const CompactHistoryList = ({ alerts, loading }) => {
     );
 
   return (
-    <div className="space-y-3 p-2">
+    <div className="space-y-2 p-3">
       {alerts.map((alert) => (
-        <div
+        <button
           key={alert.id}
-          className="group bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all flex items-start gap-3"
+          onClick={() => onAlertClick(alert)}
+          className="w-full text-left group bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all"
         >
-          <div
-            className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${
-              alert.priority === "CRITICAL"
-                ? "bg-red-500 shadow-md shadow-red-200"
-                : alert.priority === "HIGH"
-                ? "bg-orange-400"
-                : "bg-green-500"
-            }`}
-          />
-          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-            <div className="flex items-start justify-between">
-              <div>
+          <div className="flex items-start gap-3">
+            <div
+              className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${
+                alert.severity === "CRITICAL"
+                  ? "bg-red-500"
+                  : alert.severity === "HIGH"
+                  ? "bg-orange-400"
+                  : "bg-green-500"
+              }`}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between mb-1">
                 <h4 className="font-semibold text-xs text-gray-900">
-                  {alert.equipment?.name || "Unknown Equipment"}
+                  {alert.title}
                 </h4>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] text-gray-500 flex items-center gap-1">
-                    <ImLab className="w-3 h-3" />{" "}
-                    {alert.lab?.name || "Unknown Lab"}
-                  </span>
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
-                    {alert.type?.replace(/_/g, " ") || "ALERT"}
-                  </span>
-                </div>
+                <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                  <FaClock className="w-3 h-3" />
+                  {new Date(
+                    alert.resolvedAt || alert.createdAt
+                  ).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
               </div>
-              <span className="text-[10px] text-gray-400 whitespace-nowrap flex items-center gap-1">
-                <FaClock className="w-3 h-3" />
-                {new Date(
-                  alert.resolvedAt || alert.createdAt
-                ).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </div>
-            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded border border-gray-100 leading-relaxed">
-              {alert.message}
-            </div>
-            {alert.isResolved && (
-              <div className="pt-2 mt-1 border-t border-gray-100 grid gap-1">
-                <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-medium">
-                  <FaUserCheck className="w-3 h-3" />
-                  Resolved by {alert.resolver?.name || "Admin"}
-                </div>
+              <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                <span>{alert.equipment?.name || "Unknown"}</span>
+                <span>•</span>
+                <span>{alert.equipment?.lab?.name || "Unknown Lab"}</span>
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -141,10 +140,15 @@ const CompactHistoryList = ({ alerts, loading }) => {
 
 export default function LabManagerDashboard() {
   const navigate = useNavigate();
-  const { triggerEquipmentModal, triggerBreakdownModal } = useOutletContext() || {};
-  
+  const { triggerEquipmentModal, triggerBreakdownModal } =
+    useOutletContext() || {};
+
   const { user, checkAuth } = useAuthStore();
-  const { overview, fetchOverview, isLoading: dashboardLoading } = useDashboardStore();
+  const {
+    overview,
+    fetchOverview,
+    isLoading: dashboardLoading,
+  } = useDashboardStore();
   const {
     equipment,
     fetchEquipment,
@@ -169,6 +173,8 @@ export default function LabManagerDashboard() {
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [liveEquipmentData, setLiveEquipmentData] = useState({});
 
+  const [selectedAlert, setSelectedAlert] = useState(null);
+
   const [isAddBreakdownModalOpen, setIsAddBreakdownModalOpen] = useState(false);
   const [breakdownAlertToRespond, setBreakdownAlertToRespond] = useState(null);
   const [selectedLabId, setSelectedLabId] = useState("all");
@@ -186,7 +192,8 @@ export default function LabManagerDashboard() {
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   // Mark Maintenance Modal State
-  const [isMarkMaintenanceModalOpen, setIsMarkMaintenanceModalOpen] = useState(false);
+  const [isMarkMaintenanceModalOpen, setIsMarkMaintenanceModalOpen] =
+    useState(false);
   const [equipmentToMaintain, setEquipmentToMaintain] = useState(null);
 
   const prevEqTrigger = useRef(triggerEquipmentModal || 0);
@@ -194,71 +201,74 @@ export default function LabManagerDashboard() {
 
   // --- SOCKET.IO CONNECTION ---
   useEffect(() => {
-    console.log('🔌 [LabManager] Setting up Socket.IO connection...');
+    console.log("🔌 [LabManager] Setting up Socket.IO connection...");
 
     let token = null;
     try {
-      const authStorage = localStorage.getItem('auth-storage');
+      const authStorage = localStorage.getItem("auth-storage");
       if (authStorage) {
         const parsed = JSON.parse(authStorage);
         token = parsed?.state?.accessToken;
       }
     } catch (e) {
-      console.error('❌ [LabManager] Failed to parse auth token:', e);
+      console.error("❌ [LabManager] Failed to parse auth token:", e);
     }
 
     if (!token) {
-      console.error('❌ [LabManager] No access token found');
+      console.error("❌ [LabManager] No access token found");
       return;
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const socketUrl = apiUrl.replace('/api', '');
-    
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    const socketUrl = apiUrl.replace("/api", "");
+
     const socketInstance = io(socketUrl, {
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
 
-    socketInstance.on('connect', () => {
-      console.log('✅ [LabManager] Socket.IO connected!', socketInstance.id);
+    socketInstance.on("connect", () => {
+      console.log("✅ [LabManager] Socket.IO connected!", socketInstance.id);
       setIsSocketConnected(true);
     });
 
-    socketInstance.on('disconnect', (reason) => {
-      console.log('❌ [LabManager] Socket.IO disconnected:', reason);
+    socketInstance.on("disconnect", (reason) => {
+      console.log("❌ [LabManager] Socket.IO disconnected:", reason);
       setIsSocketConnected(false);
     });
 
-    socketInstance.on('connect_error', (error) => {
-      console.error('❌ [LabManager] Socket.IO connection error:', error.message);
+    socketInstance.on("connect_error", (error) => {
+      console.error(
+        "❌ [LabManager] Socket.IO connection error:",
+        error.message
+      );
       setIsSocketConnected(false);
     });
 
     // Listen for equipment status updates
-    socketInstance.on('equipment:status', (data) => {
-      console.log('📡 [LabManager] Equipment status update:', data);
+    socketInstance.on("equipment:status", (data) => {
+      console.log("📡 [LabManager] Equipment status update:", data);
       handleEquipmentUpdate(data);
     });
 
-    socketInstance.on('equipment:status:update', (data) => {
-      console.log('📡 [LabManager] Equipment status update (alt):', data);
+    socketInstance.on("equipment:status:update", (data) => {
+      console.log("📡 [LabManager] Equipment status update (alt):", data);
       handleEquipmentUpdate(data.status || data);
     });
 
     // 🚨 NEW: Listen for new alerts
-    socketInstance.on('alert:new', (alert) => {
-      console.log('🚨 [LabManager] New alert received:', alert);
+    socketInstance.on("alert:new", (alert) => {
+      console.log("🚨 [LabManager] New alert received:", alert);
       handleNewAlert(alert);
     });
 
     setSocket(socketInstance);
 
     return () => {
-      console.log('🔌 [LabManager] Cleaning up Socket.IO connection');
+      console.log("🔌 [LabManager] Cleaning up Socket.IO connection");
       socketInstance.removeAllListeners();
       socketInstance.disconnect();
     };
@@ -267,13 +277,18 @@ export default function LabManagerDashboard() {
   // --- HANDLE LIVE EQUIPMENT UPDATES ---
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
-    
+
     if (!equipmentId) {
-      console.warn('⚠️ [LabManager] No equipmentId in update data', data);
+      console.warn("⚠️ [LabManager] No equipmentId in update data", data);
       return;
     }
 
-    console.log('🔄 [LabManager] Updating equipment:', equipmentId, 'Status:', data.status);
+    console.log(
+      "🔄 [LabManager] Updating equipment:",
+      equipmentId,
+      "Status:",
+      data.status
+    );
 
     // Update live data state
     setLiveEquipmentData((prev) => ({
@@ -285,23 +300,25 @@ export default function LabManagerDashboard() {
     }));
 
     // Refresh overview if equipment becomes faulty
-    if (data.status === 'FAULTY') {
-      console.log('⚠️ [LabManager] Equipment became FAULTY, refreshing overview');
+    if (data.status === "FAULTY") {
+      console.log(
+        "⚠️ [LabManager] Equipment became FAULTY, refreshing overview"
+      );
       fetchOverview();
     }
   };
 
   // 🚨 NEW: Handle New Alert
   const handleNewAlert = (alert) => {
-    console.log('🚨 [LabManager] Processing new alert:', alert);
-    
+    console.log("🚨 [LabManager] Processing new alert:", alert);
+
     // Add to active alerts if on active tab
-    if (alertTab === 'active') {
+    if (alertTab === "active") {
       setActiveAlerts((prev) => {
         // Check if alert already exists
-        const exists = prev.some(a => a.id === alert.id);
+        const exists = prev.some((a) => a.id === alert.id);
         if (exists) return prev;
-        
+
         // Add new alert to the top
         return [alert, ...prev];
       });
@@ -311,10 +328,10 @@ export default function LabManagerDashboard() {
     fetchOverview();
 
     // Show notification (optional)
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('⚠️ Equipment Alert', {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("⚠️ Equipment Alert", {
         body: `${alert.title}: ${alert.equipment?.name}`,
-        icon: '/favicon.ico',
+        icon: "/favicon.ico",
       });
     }
   };
@@ -331,7 +348,8 @@ export default function LabManagerDashboard() {
         status: liveData.status || eq.status?.status,
         temperature: liveData.temperature ?? eq.status?.temperature,
         vibration: liveData.vibration ?? eq.status?.vibration,
-        energyConsumption: liveData.energyConsumption ?? eq.status?.energyConsumption,
+        energyConsumption:
+          liveData.energyConsumption ?? eq.status?.energyConsumption,
         healthScore: liveData.healthScore ?? eq.status?.healthScore,
       },
     };
@@ -504,6 +522,7 @@ export default function LabManagerDashboard() {
       await fetchActiveAlertsIsolated();
       if (historyAlerts.length > 0 || alertTab === "history")
         fetchHistoryAlertsIsolated();
+      setSelectedAlert(null); // Close modal after resolve
     } catch (error) {
       console.error("Failed to resolve alert:", error);
     }
@@ -541,12 +560,23 @@ export default function LabManagerDashboard() {
     const filteredData = getFilteredEquipment();
     if (!filteredData.length) return;
     const headers = [
-      "Equipment ID", "Name", "Department", "Lab", "Status",
-      "Manufacturer", "Model", "Purchase Date",
+      "Equipment ID",
+      "Name",
+      "Department",
+      "Lab",
+      "Status",
+      "Manufacturer",
+      "Model",
+      "Purchase Date",
     ];
     const rows = filteredData.map((eq) => [
-      eq.equipmentId, eq.name, eq.department, eq.lab?.name || "",
-      eq.status?.status || "", eq.manufacturer, eq.model,
+      eq.equipmentId,
+      eq.name,
+      eq.department,
+      eq.lab?.name || "",
+      eq.status?.status || "",
+      eq.manufacturer,
+      eq.model,
       new Date(eq.purchaseDate).toLocaleDateString(),
     ]);
     const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
@@ -660,7 +690,10 @@ export default function LabManagerDashboard() {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto w-full relative [&::-webkit-scrollbar:horizontal]:hidden" style={{ overflowX: "hidden" }}>
+          <div
+            className="flex-1 overflow-y-auto w-full relative [&::-webkit-scrollbar:horizontal]:hidden"
+            style={{ overflowX: "hidden" }}
+          >
             <div className="p-2 min-w-0 w-full">
               {breakdownEquipment.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400 py-8">
@@ -726,7 +759,13 @@ export default function LabManagerDashboard() {
                       onClick={() => handleSelectLab(lab.labId)}
                       className="w-full text-left px-4 py-2.5 text-xs hover:bg-gray-50 flex items-center justify-between group transition-colors"
                     >
-                      <span className={selectedLabId === lab.labId ? "font-semibold text-blue-600" : "text-gray-700"}>
+                      <span
+                        className={
+                          selectedLabId === lab.labId
+                            ? "font-semibold text-blue-600"
+                            : "text-gray-700"
+                        }
+                      >
                         {lab.name}
                       </span>
                       {selectedLabId === lab.labId && (
@@ -739,14 +778,13 @@ export default function LabManagerDashboard() {
             </div>
 
             <div className="flex items-center gap-3 flex-1 justify-end">
-              
               {/* Log Maintenance Button - Added here as well for visibility */}
               <button
-                 onClick={() => {
-                   setEquipmentToMaintain(null);
-                   setIsMarkMaintenanceModalOpen(true);
-                 }}
-                 className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg text-xs font-semibold hover:bg-orange-100 transition-colors"
+                onClick={() => {
+                  setEquipmentToMaintain(null);
+                  setIsMarkMaintenanceModalOpen(true);
+                }}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg text-xs font-semibold hover:bg-orange-100 transition-colors"
               >
                 <FaWrench className="w-3 h-3" />
                 Log Maintenance
@@ -786,7 +824,9 @@ export default function LabManagerDashboard() {
 
             {selectedLabId !== "all" && (
               <button
-                onClick={() => navigate(`/dashboard/lab-analytics/${selectedLabId}`)}
+                onClick={() =>
+                  navigate(`/dashboard/lab-analytics/${selectedLabId}`)
+                }
                 className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-gray-200 hover:border-blue-100 transition-colors shadow-md"
                 title="Go to Lab Analytics"
               >
@@ -802,7 +842,9 @@ export default function LabManagerDashboard() {
               </div>
             ) : filteredEquipment.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-sm text-gray-500 font-medium">No equipment found</p>
+                <p className="text-sm text-gray-500 font-medium">
+                  No equipment found
+                </p>
                 {selectedLabId === "all" && (
                   <button
                     onClick={() => setIsModalOpen(true)}
@@ -858,7 +900,7 @@ export default function LabManagerDashboard() {
               </button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-0">
             {alertTab === "active" ? (
               isActiveAlertsLoading ? (
                 <div className="flex justify-center py-6">
@@ -867,7 +909,7 @@ export default function LabManagerDashboard() {
               ) : (
                 <AlertsList
                   alerts={activeAlerts}
-                  onResolve={handleResolveAlert}
+                  onAlertClick={(alert) => setSelectedAlert(alert)}
                   compact={true}
                 />
               )
@@ -875,9 +917,18 @@ export default function LabManagerDashboard() {
               <CompactHistoryList
                 alerts={historyAlerts}
                 loading={isHistoryLoading}
+                onAlertClick={(alert) => setSelectedAlert(alert)}
               />
             )}
           </div>
+          {/* Alert Details Modal */}
+          {selectedAlert && (
+            <AlertModal
+              alert={selectedAlert}
+              onClose={() => setSelectedAlert(null)}
+              onResolve={selectedAlert.isResolved ? null : handleResolveAlert}
+            />
+          )}
         </div>
       </div>
 

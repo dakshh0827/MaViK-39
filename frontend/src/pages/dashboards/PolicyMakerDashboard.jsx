@@ -21,6 +21,7 @@ import AlertsList from "../../components/dashboard/AlertsList";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import LabManagerForm from "../../components/admin/LabManagerForm"; // Corrected casing if needed
 import InstituteManagerForm from "../../components/admin/InstituteManagerForm";
+import AlertModal from "../../components/dashboard/AlertModal";
 import api from "../../lib/axios";
 import {
   FaChartLine,
@@ -250,7 +251,7 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
 };
 
 // --- Compact History List ---
-const CompactHistoryList = ({ alerts, loading }) => {
+const CompactHistoryList = ({ alerts, loading, onAlertClick }) => {
   if (loading)
     return (
       <div className="flex justify-center py-4">
@@ -265,67 +266,46 @@ const CompactHistoryList = ({ alerts, loading }) => {
     );
 
   return (
-    <div className="space-y-3 p-2">
+    <div className="space-y-2 p-3">
       {alerts.map((alert) => (
-        <div
+        <button
           key={alert.id}
-          className="group bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all flex items-start gap-3"
+          onClick={() => onAlertClick(alert)}
+          className="w-full text-left group bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all"
         >
-          <div
-            className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${
-              alert.priority === "CRITICAL"
-                ? "bg-red-500 shadow-md shadow-red-200"
-                : alert.priority === "HIGH"
-                ? "bg-orange-400"
-                : "bg-green-500"
-            }`}
-            title={`Priority: ${alert.priority}`}
-          />
-          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-            <div className="flex items-start justify-between">
-              <div>
+          <div className="flex items-start gap-3">
+            <div
+              className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${
+                alert.priority === "CRITICAL"
+                  ? "bg-red-500 shadow-md shadow-red-200"
+                  : alert.priority === "HIGH"
+                  ? "bg-orange-400"
+                  : "bg-green-500"
+              }`}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between mb-1">
                 <h4 className="font-semibold text-xs text-gray-900">
-                  {alert.equipment?.name || "Unknown Equipment"}
+                  {alert.title || alert.equipment?.name || "Alert"}
                 </h4>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] text-gray-500 flex items-center gap-1">
-                    <ImLab className="w-3 h-3" />{" "}
-                    {alert.lab?.name || "Unknown Lab"}
-                  </span>
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
-                    {alert.type?.replace(/_/g, " ") || "ALERT"}
-                  </span>
-                </div>
+                <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                  <FaClock className="w-3 h-3" />
+                  {new Date(
+                    alert.resolvedAt || alert.createdAt
+                  ).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
               </div>
-              <span className="text-[10px] text-gray-400 whitespace-nowrap flex items-center gap-1">
-                <FaClock className="w-3 h-3" />
-                {new Date(
-                  alert.resolvedAt || alert.createdAt
-                ).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </div>
-            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded border border-gray-100 leading-relaxed">
-              {alert.message}
-            </div>
-            {alert.isResolved && (
-              <div className="pt-2 mt-1 border-t border-gray-100 grid gap-1">
-                <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-medium">
-                  <FaUserCheck className="w-3 h-3" />
-                  Resolved by {alert.resolver?.name || "Admin"}
-                </div>
-                {alert.resolutionNotes && (
-                  <div className="flex items-start gap-1.5 text-[10px] text-gray-500 italic pl-0.5">
-                    <FaCommentAlt className="w-3 h-3 mt-0.5 flex-shrink-0" />"
-                    {alert.resolutionNotes}"
-                  </div>
-                )}
+              <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                <span>{alert.equipment?.name || "Unknown"}</span>
+                <span>•</span>
+                <span>{alert.lab?.name || "Unknown Lab"}</span>
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -346,6 +326,8 @@ export default function PolicyMakerDashboard() {
   const [isActiveAlertsLoading, setIsActiveAlertsLoading] = useState(false);
   const [historyAlerts, setHistoryAlerts] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  const [selectedAlert, setSelectedAlert] = useState(null);
 
   const { labs, fetchLabs, deleteLab, isLoading: labLoading } = useLabStore();
   const { reorderRequests, fetchReorderRequests, reviewReorderRequest } =
@@ -377,60 +359,63 @@ export default function PolicyMakerDashboard() {
 
   // --- SOCKET CONNECTION EFFECT ---
   useEffect(() => {
-    console.log('🔌 [PolicyMaker] Setting up Socket.IO connection...');
+    console.log("🔌 [PolicyMaker] Setting up Socket.IO connection...");
 
     let token = null;
     try {
-      const authStorage = localStorage.getItem('auth-storage');
+      const authStorage = localStorage.getItem("auth-storage");
       if (authStorage) {
         const parsed = JSON.parse(authStorage);
         token = parsed?.state?.accessToken;
       }
     } catch (e) {
-      console.error('❌ [PolicyMaker] Failed to parse auth token:', e);
+      console.error("❌ [PolicyMaker] Failed to parse auth token:", e);
     }
 
     if (!token) {
-      console.error('❌ [PolicyMaker] No access token found');
+      console.error("❌ [PolicyMaker] No access token found");
       return;
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const socketUrl = apiUrl.replace('/api', '');
-    
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    const socketUrl = apiUrl.replace("/api", "");
+
     const socketInstance = io(socketUrl, {
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
 
-    socketInstance.on('connect', () => {
-      console.log('✅ [PolicyMaker] Socket.IO connected!', socketInstance.id);
+    socketInstance.on("connect", () => {
+      console.log("✅ [PolicyMaker] Socket.IO connected!", socketInstance.id);
       setIsSocketConnected(true);
     });
 
-    socketInstance.on('disconnect', (reason) => {
-      console.log('❌ [PolicyMaker] Socket.IO disconnected:', reason);
+    socketInstance.on("disconnect", (reason) => {
+      console.log("❌ [PolicyMaker] Socket.IO disconnected:", reason);
       setIsSocketConnected(false);
     });
 
-    socketInstance.on('connect_error', (error) => {
-      console.error('❌ [PolicyMaker] Socket.IO connection error:', error.message);
+    socketInstance.on("connect_error", (error) => {
+      console.error(
+        "❌ [PolicyMaker] Socket.IO connection error:",
+        error.message
+      );
       setIsSocketConnected(false);
     });
 
     // Listen for new alerts
-    socketInstance.on('alert:new', (alert) => {
-      console.log('🚨 [PolicyMaker] New alert received:', alert);
+    socketInstance.on("alert:new", (alert) => {
+      console.log("🚨 [PolicyMaker] New alert received:", alert);
       handleNewAlert(alert);
     });
 
     setSocket(socketInstance);
 
     return () => {
-      console.log('🔌 [PolicyMaker] Cleaning up Socket.IO connection');
+      console.log("🔌 [PolicyMaker] Cleaning up Socket.IO connection");
       socketInstance.removeAllListeners();
       socketInstance.disconnect();
     };
@@ -449,10 +434,10 @@ export default function PolicyMakerDashboard() {
     fetchOverview();
 
     // 3. Show notification
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('⚠️ Policy Maker Alert', {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("⚠️ Policy Maker Alert", {
         body: `${alert.title}: ${alert.equipment?.name}`,
-        icon: '/favicon.ico',
+        icon: "/favicon.ico",
       });
     }
   };
@@ -574,6 +559,7 @@ export default function PolicyMakerDashboard() {
       await resolveAlert(alertId);
       await Promise.all([fetchActiveAlertsIsolated(), fetchOverview()]);
       if (alertTab === "history") fetchHistoryAlertsIsolated();
+      setSelectedAlert(null); // Close modal
     } catch (error) {
       console.error("Failed to resolve alert:", error);
       alert("Failed to resolve alert. Please try again.");
@@ -986,21 +972,28 @@ export default function PolicyMakerDashboard() {
                     <LoadingSpinner />
                   </div>
                 ) : (
-                  <div className="p-4">
-                    <AlertsList
-                      alerts={activeAlerts}
-                      onResolve={handleResolveAlert}
-                      compact={true}
-                    />
-                  </div>
+                  <AlertsList
+                    alerts={activeAlerts}
+                    onAlertClick={(alert) => setSelectedAlert(alert)}
+                    compact={true}
+                  />
                 )
               ) : (
                 <CompactHistoryList
                   alerts={historyAlerts}
                   loading={isHistoryLoading}
+                  onAlertClick={(alert) => setSelectedAlert(alert)}
                 />
               )}
             </div>
+            {/* Alert Details Modal */}
+            {selectedAlert && (
+              <AlertModal
+                alert={selectedAlert}
+                onClose={() => setSelectedAlert(null)}
+                onResolve={selectedAlert.isResolved ? null : handleResolveAlert}
+              />
+            )}
           </div>
 
           <div className="flex-1 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col min-h-0">
@@ -1268,7 +1261,8 @@ export default function PolicyMakerDashboard() {
                           <LoadingSpinner size="sm" color="white" />
                         ) : (
                           <>
-                            <FaCheckCircle className="w-4 h-4" /> Approve Request
+                            <FaCheckCircle className="w-4 h-4" /> Approve
+                            Request
                           </>
                         )}
                       </button>

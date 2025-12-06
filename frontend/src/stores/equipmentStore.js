@@ -106,7 +106,6 @@ export const useEquipmentStore = create((set, get) => ({
       throw new Error(errorMessage);
     }
   },
-
   // Update equipment
   updateEquipment: async (id, data) => {
     set({ isLoading: true, error: null });
