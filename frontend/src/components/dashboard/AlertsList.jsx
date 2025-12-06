@@ -1,58 +1,52 @@
-/*
- * =====================================================
- * 3. frontend/src/components/dashboard/AlertsList.jsx
- * =====================================================
- */
+// frontend/src/components/dashboard/AlertsList.jsx
+import React from "react";
 import {
   FaExclamationTriangle,
   FaCheckCircle,
   FaClock,
   FaQuestionCircle,
+  FaMapMarkerAlt,
 } from "react-icons/fa";
-
-// Helper to format department names
-const DEPARTMENT_DISPLAY_NAMES = {
-  FITTER_MANUFACTURING: "Fitter/Manufacturing",
-  ELECTRICAL_ENGINEERING: "Electrical Engineering",
-  WELDING_FABRICATION: "Welding & Fabrication",
-  TOOL_DIE_MAKING: "Tool & Die Making",
-  ADDITIVE_MANUFACTURING: "Additive Manufacturing",
-  SOLAR_INSTALLER_PV: "Solar Installer (PV)",
-  MATERIAL_TESTING_QUALITY: "Material Testing/Quality",
-  ADVANCED_MANUFACTURING_CNC: "Advanced Manufacturing/CNC",
-  AUTOMOTIVE_MECHANIC: "Automotive/Mechanic",
-};
+import { ImLab } from "react-icons/im";
 
 const SEVERITY_CONFIG = {
   CRITICAL: {
-    color: "bg-red-100 text-red-800 border-red-200",
+    color: "bg-red-50 border-red-200 hover:border-red-300",
+    badge: "bg-red-500",
+    dot: "bg-red-500",
     icon: FaExclamationTriangle,
   },
   HIGH: {
-    color: "bg-orange-100 text-orange-800 border-orange-200",
+    color: "bg-orange-50 border-orange-200 hover:border-orange-300",
+    badge: "bg-orange-500",
+    dot: "bg-orange-500",
     icon: FaExclamationTriangle,
   },
   MEDIUM: {
-    color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    color: "bg-yellow-50 border-yellow-200 hover:border-yellow-300",
+    badge: "bg-yellow-500",
+    dot: "bg-yellow-500",
     icon: FaClock,
   },
   LOW: {
-    color: "bg-blue-100 text-blue-800 border-blue-200",
+    color: "bg-blue-50 border-blue-200 hover:border-blue-300",
+    badge: "bg-blue-500",
+    dot: "bg-blue-500",
     icon: FaQuestionCircle,
   },
 };
 
-export default function AlertsList({ alerts, onResolve }) {
+export default function AlertsList({ alerts, onAlertClick, compact = true }) {
   const getSeverity = (severity) => {
     return SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.LOW;
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2 p-3">
       {alerts.length === 0 ? (
         <div className="text-center py-8">
           <FaCheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">No unresolved alerts</p>
+          <p className="text-gray-500 text-sm">No alerts</p>
         </div>
       ) : (
         alerts.map((alert) => {
@@ -62,67 +56,64 @@ export default function AlertsList({ alerts, onResolve }) {
           const lab = equipment?.lab;
 
           return (
-            <div
+            <button
               key={alert.id}
-              className={`p-4 rounded-lg border ${severity.color}`}
+              onClick={() => onAlertClick && onAlertClick(alert)}
+              className={`w-full text-left p-3 rounded-lg border ${severity.color} hover:shadow-md transition-all group cursor-pointer`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  {/* Alert Title and Severity */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <SeverityIcon className="w-4 h-4" />
-                    <span className="font-semibold text-sm">
+              <div className="flex items-start gap-3">
+                {/* Severity Indicator */}
+                <div className="flex-shrink-0 pt-0.5">
+                  <div
+                    className={`w-2 h-2 rounded-full ${severity.dot} shadow-sm`}
+                  />
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  {/* Title & Severity Badge */}
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <h4 className="font-semibold text-sm text-gray-900 line-clamp-1 group-hover:text-gray-800">
                       {alert.title}
-                    </span>
-                    <span className="text-xs font-medium px-2 py-0.5 bg-white rounded">
+                    </h4>
+                    <span
+                      className={`flex-shrink-0 px-2 py-0.5 text-[10px] font-bold rounded-full ${severity.badge} text-white`}
+                    >
                       {alert.severity}
                     </span>
                   </div>
 
-                  {/* Alert Message */}
-                  <p className="text-sm mb-2">{alert.message}</p>
-
-                  {/* Alert Context */}
+                  {/* Equipment & Lab Info */}
                   {equipment && lab && (
-                    <div className="text-xs opacity-80">
-                      {lab.instituteId && (
-                        <>
-                          <span>{lab.instituteId}</span>
-                          <span className="mx-1">➔</span>
-                        </>
-                      )}
-                      <span>
-                        {DEPARTMENT_DISPLAY_NAMES[lab.department] ||
-                          lab.department}
-                      </span>
-                      <span className="mx-1">➔</span>
-                      <span>{lab.name}</span>
-                      <span className="mx-1">➔</span>
-                      <span className="font-medium">{equipment.name}</span>
-                      <span className="text-gray-600">
-                        {" "}
-                        ({equipment.equipmentId})
-                      </span>
+                    <div className="space-y-1 mb-2">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <FaMapMarkerAlt className="w-3 h-3 text-gray-400" />
+                        <span className="font-medium">{equipment.name}</span>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-500">
+                          {equipment.equipmentId}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <ImLab className="w-3 h-3 text-gray-400" />
+                        <span>{lab.name}</span>
+                      </div>
                     </div>
                   )}
 
                   {/* Timestamp */}
-                  <p className="text-xs text-gray-600 mt-2">
-                    {new Date(alert.createdAt).toLocaleString()}
-                  </p>
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                    <FaClock className="w-3 h-3" />
+                    {new Date(alert.createdAt).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
                 </div>
-
-                {/* Resolve Button */}
-                {!alert.isResolved && onResolve && (
-                  <button
-                    onClick={() => onResolve(alert.id)}
-                    className="ml-4 px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-800 font-medium"
-                  >
-                    Resolve
-                  </button>
-                )}
               </div>
-            </div>
+            </button>
           );
         })
       )}

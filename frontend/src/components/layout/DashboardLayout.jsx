@@ -12,7 +12,7 @@ import {
   FaUniversity,
   FaBuilding,
   FaDesktop,
-  FaExclamationTriangle
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import { useState, useEffect, useRef } from "react";
 import { useAuthStore } from "../../stores/authStore";
@@ -266,9 +266,7 @@ export default function DashboardLayout() {
           transition: "left 0.3s ease",
         }}
       >
-        <h1 className="text-2xl font-bold text-blue-600">
-          MaViK-39
-        </h1>
+        <h1 className="text-2xl font-bold text-blue-600">MaViK-39</h1>
 
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600 hidden sm:block">
