@@ -1,15 +1,16 @@
 /*
  * =====================================================
- * PolicyMakerDashboard.jsx - REMOVED CREATE BUTTONS
+ * PolicyMakerDashboard.jsx - REAL-TIME SOCKETS ENABLED
  * =====================================================
- * 1. Removed 'Create New Lab' card from the Grid View.
- * 2. Removed '+ Create New Lab' button from the List View.
- * 3. Preserved all Modal/Portal fixes and existing logic.
+ * 1. Added Socket.IO integration for real-time alerts.
+ * 2. Added live updates for Active Alerts list.
+ * 3. Preserved all previous UI fixes (Modals, Charts).
  */
 
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
+import io from "socket.io-client"; // Added Socket.IO
 import { useDashboardStore } from "../../stores/dashboardStore";
 import { useAlertStore } from "../../stores/alertStore";
 import { useLabStore } from "../../stores/labStore";
@@ -18,7 +19,7 @@ import { useInstituteStore } from "../../stores/instituteStore";
 import { useBreakdownStore } from "../../stores/breakdownStore";
 import AlertsList from "../../components/dashboard/AlertsList";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
-import LabManagerForm from "../../components/admin/labManagerForm";
+import LabManagerForm from "../../components/admin/LabManagerForm"; // Corrected casing if needed
 import InstituteManagerForm from "../../components/admin/InstituteManagerForm";
 import api from "../../lib/axios";
 import {
@@ -47,8 +48,10 @@ import {
   FaCommentAlt,
   FaClock,
   FaUserCheck,
+  FaWifi, // Added Wifi icon
 } from "react-icons/fa";
 import { ImLab } from "react-icons/im";
+import { MdOutlineWifiOff } from "react-icons/md"; // Added Offline icon
 
 const DEPARTMENT_DISPLAY_NAMES = {
   FITTER_MANUFACTURING: "Fitter/Manufacturing",
@@ -64,17 +67,12 @@ const DEPARTMENT_DISPLAY_NAMES = {
 
 // --- CSS STYLE TO FORCE-FIX CHILD MODALS ---
 const modalStripperStyle = `
-  /* Target ALL fixed/absolute position elements inside modal-stripper */
   .modal-stripper * {
     position: static !important;
   }
-  
-  /* Allow only the direct content card to have relative positioning */
   .modal-stripper > *:last-child {
     position: relative !important;
   }
-  
-  /* Strip all background overlays and backdrops */
   .modal-stripper div[class*="fixed"],
   .modal-stripper div[class*="absolute"],
   .modal-stripper div[class*="inset"],
@@ -84,17 +82,14 @@ const modalStripperStyle = `
     background-color: transparent !important;
     backdrop-filter: none !important;
   }
-  
-  /* Ensure no pseudo-element overlays */
   .modal-stripper::before,
   .modal-stripper::after {
     display: none !important;
   }
 `;
 
-// --- UPDATED: Modal Wrapper ---
+// --- Modal Wrapper ---
 const ModalWrapper = ({ children, onClose }) => {
-  // Close on Escape key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === "Escape") onClose();
@@ -105,13 +100,10 @@ const ModalWrapper = ({ children, onClose }) => {
 
   return createPortal(
     <div
-      // UPDATED: Changed bg-slate-900/60 to bg-black/40 and backdrop-blur-sm to md for better translucency
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-md transition-all animate-in fade-in duration-200"
       onClick={onClose}
     >
       <style>{modalStripperStyle}</style>
-
-      {/* Content Container */}
       <div
         className="modal-stripper relative w-auto max-w-4xl max-h-[90vh] overflow-y-auto p-4 flex flex-col items-center justify-center"
         onClick={(e) => e.stopPropagation()}
@@ -379,6 +371,92 @@ export default function PolicyMakerDashboard() {
   const [reviewComment, setReviewComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
+  // --- SOCKET STATE ---
+  const [socket, setSocket] = useState(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+
+  // --- SOCKET CONNECTION EFFECT ---
+  useEffect(() => {
+    console.log('🔌 [PolicyMaker] Setting up Socket.IO connection...');
+
+    let token = null;
+    try {
+      const authStorage = localStorage.getItem('auth-storage');
+      if (authStorage) {
+        const parsed = JSON.parse(authStorage);
+        token = parsed?.state?.accessToken;
+      }
+    } catch (e) {
+      console.error('❌ [PolicyMaker] Failed to parse auth token:', e);
+    }
+
+    if (!token) {
+      console.error('❌ [PolicyMaker] No access token found');
+      return;
+    }
+
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const socketUrl = apiUrl.replace('/api', '');
+    
+    const socketInstance = io(socketUrl, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    socketInstance.on('connect', () => {
+      console.log('✅ [PolicyMaker] Socket.IO connected!', socketInstance.id);
+      setIsSocketConnected(true);
+    });
+
+    socketInstance.on('disconnect', (reason) => {
+      console.log('❌ [PolicyMaker] Socket.IO disconnected:', reason);
+      setIsSocketConnected(false);
+    });
+
+    socketInstance.on('connect_error', (error) => {
+      console.error('❌ [PolicyMaker] Socket.IO connection error:', error.message);
+      setIsSocketConnected(false);
+    });
+
+    // Listen for new alerts
+    socketInstance.on('alert:new', (alert) => {
+      console.log('🚨 [PolicyMaker] New alert received:', alert);
+      handleNewAlert(alert);
+    });
+
+    setSocket(socketInstance);
+
+    return () => {
+      console.log('🔌 [PolicyMaker] Cleaning up Socket.IO connection');
+      socketInstance.removeAllListeners();
+      socketInstance.disconnect();
+    };
+  }, []);
+
+  // --- HANDLE NEW ALERT ---
+  const handleNewAlert = (alert) => {
+    // 1. Update active alerts list if on "active" tab
+    setActiveAlerts((prev) => {
+      const exists = prev.some((a) => a.id === alert.id);
+      if (exists) return prev;
+      return [alert, ...prev];
+    });
+
+    // 2. Refresh overview stats (to update counters)
+    fetchOverview();
+
+    // 3. Show notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('⚠️ Policy Maker Alert', {
+        body: `${alert.title}: ${alert.equipment?.name}`,
+        icon: '/favicon.ico',
+      });
+    }
+  };
+
   const parseAlertResponse = (response) => {
     if (!response) return [];
     if (Array.isArray(response)) return response;
@@ -522,11 +600,7 @@ export default function PolicyMakerDashboard() {
     setReviewComment("");
     setSelectedRequest(request);
   };
-  // Removed handleOpenCreateLab usage from UI but keeping function just in case logic needed later
-  const handleOpenCreateLab = () => {
-    setEditingLab(null);
-    setIsLabModalOpen(true);
-  };
+
   const handleOpenEditLab = (lab) => {
     setEditingLab(lab);
     setIsLabModalOpen(true);
@@ -680,6 +754,18 @@ export default function PolicyMakerDashboard() {
                 <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs font-medium">
                   {labsList.length}
                 </span>
+                {/* Connection Status Badge */}
+                {isSocketConnected ? (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full border border-green-200 ml-2">
+                    <FaWifi className="w-2.5 h-2.5" />
+                    Live
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-bold rounded-full border border-gray-200 ml-2">
+                    <MdOutlineWifiOff className="w-2.5 h-2.5" />
+                    Offline
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-3 flex-1 justify-end">
                 <div className="flex items-center gap-2 max-w-2xl flex-1 justify-end">
@@ -743,7 +829,6 @@ export default function PolicyMakerDashboard() {
                 </div>
               ) : viewMode === "cards" ? (
                 <div className="grid grid-cols-3 gap-4">
-                  {/* --- REMOVED CREATE NEW LAB CARD --- */}
                   {labsList.map((lab) => (
                     <div
                       key={lab.labId}
@@ -800,7 +885,6 @@ export default function PolicyMakerDashboard() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {/* --- REMOVED LIST VIEW HEADER BUTTON --- */}
                   {labsList.map((lab) => (
                     <div
                       key={lab.labId}

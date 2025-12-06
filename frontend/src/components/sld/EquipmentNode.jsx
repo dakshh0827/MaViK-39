@@ -1,7 +1,8 @@
 /*
  * =====================================================
- * frontend/src/components/sld/EquipmentNode.jsx (FIXED BADGE)
+ * frontend/src/components/sld/EquipmentNode.jsx
  * =====================================================
+ * Updated to support 'FAULTY' status for Real-Time monitoring
  */
 import { useState, memo } from "react";
 import {
@@ -12,9 +13,10 @@ import {
   X,
   AlertTriangle,
   GraduationCap,
+  AlertCircle, // Added for FAULTY status
 } from "lucide-react";
 
-// STRICT 3-STATE CONFIGURATION
+// STRICT 4-STATE CONFIGURATION (Added FAULTY)
 const STATUS_CONFIG = {
   OPERATIONAL: {
     color: "bg-emerald-500",
@@ -40,12 +42,24 @@ const STATUS_CONFIG = {
     icon: Clock,
     label: "Idle",
   },
+  FAULTY: {
+    color: "bg-red-500",
+    dotColor: "bg-red-400",
+    textColor: "text-red-700",
+    borderColor: "border-red-200",
+    icon: AlertCircle,
+    label: "Faulty",
+  },
 };
 
 const getDisplayStatus = (backendStatus) => {
   if (!backendStatus) return "IDLE";
 
   const status = backendStatus.toUpperCase();
+
+  if (status === "FAULTY" || status === "MAINTENANCE") {
+    return "FAULTY";
+  }
 
   if (status === "IN_USE" || status === "IN_CLASS") {
     return "IN_USE";
