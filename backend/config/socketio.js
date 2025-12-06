@@ -102,6 +102,25 @@ const emitToAll = (event, data) => {
   }
 };
 
+const broadcastAlert = (alert) => {
+  if (!io) {
+    logger.error('❌ Cannot broadcast alert: Socket.IO not initialized!');
+    return;
+  }
+
+  logger.info('🚨 Broadcasting new alert:', {
+    alertId: alert.id,
+    equipmentId: alert.equipment?.id,
+    severity: alert.severity,
+    connectedClients: io.sockets.sockets.size
+  });
+
+  // Emit to ALL connected clients for real-time updates
+  io.emit(SOCKET_EVENTS.ALERT_NEW, alert);
+  
+  logger.info(`✅ Alert broadcast complete to ${io.sockets.sockets.size} clients`);
+};
+
 // --- Specific Broadcasters ---
 
 /**
@@ -136,10 +155,6 @@ const broadcastEquipmentStatus = (equipmentId, status) => {
   });
   
   logger.info(`✅ Broadcast complete to ${connectedClients} clients`);
-};
-
-const broadcastAlert = (alert) => {
-  emitToAll(SOCKET_EVENTS.ALERT_NEW, alert);
 };
 
 const broadcastNotification = (userId, notification) => {

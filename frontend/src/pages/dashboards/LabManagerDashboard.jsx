@@ -1,6 +1,7 @@
-// frontend/src/pages/dashboards/LabManagerDashboard.jsx
+// frontend/src/pages/dashboards/LabManagerDashboard.jsx - WITH REAL-TIME SOCKET INTEGRATION
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
+import io from "socket.io-client";
 import { useDashboardStore } from "../../stores/dashboardStore";
 import { useEquipmentStore } from "../../stores/equipmentStore";
 import { useAlertStore } from "../../stores/alertStore";
@@ -18,9 +19,11 @@ import BreakdownAlertModal from "../../components/breakdown/BreakdownAlertModal"
 import {
   FaChartLine, FaExclamationTriangle, FaWrench, FaArrowUp, FaBuilding,
   FaDownload, FaSearch, FaCheckCircle, FaChevronDown, FaClock,
-  FaUserCheck, FaCheck, FaTimes, FaExternalLinkAlt, FaPlus
+  FaUserCheck, FaCheck, FaTimes, FaExternalLinkAlt, FaPlus,
+  FaWifi
 } from "react-icons/fa";
 import { ImLab } from "react-icons/im";
+import { MdOutlineWifiOff } from "react-icons/md";
 
 // Modal Wrapper CSS
 const modalStripperStyle = `
@@ -138,8 +141,7 @@ const CompactHistoryList = ({ alerts, loading }) => {
 
 export default function LabManagerDashboard() {
   const navigate = useNavigate();
-  // Get triggerMaintenanceModal from Outlet Context (Sidebar + Button)
-  const { triggerEquipmentModal, triggerBreakdownModal, triggerMaintenanceModal } = useOutletContext() || {};
+  const { triggerEquipmentModal, triggerBreakdownModal } = useOutletContext() || {};
   
   const { user, checkAuth } = useAuthStore();
   const { overview, fetchOverview, isLoading: dashboardLoading } = useDashboardStore();
@@ -161,6 +163,11 @@ export default function LabManagerDashboard() {
     submitReorderRequest,
     resolveBreakdown,
   } = useBreakdownStore();
+
+  // Socket state
+  const [socket, setSocket] = useState(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [liveEquipmentData, setLiveEquipmentData] = useState({});
 
   const [isAddBreakdownModalOpen, setIsAddBreakdownModalOpen] = useState(false);
   const [breakdownAlertToRespond, setBreakdownAlertToRespond] = useState(null);
@@ -184,7 +191,151 @@ export default function LabManagerDashboard() {
 
   const prevEqTrigger = useRef(triggerEquipmentModal || 0);
   const prevBdTrigger = useRef(triggerBreakdownModal || 0);
-  const prevMaintTrigger = useRef(triggerMaintenanceModal || 0);
+
+  // --- SOCKET.IO CONNECTION ---
+  useEffect(() => {
+    console.log('🔌 [LabManager] Setting up Socket.IO connection...');
+
+    let token = null;
+    try {
+      const authStorage = localStorage.getItem('auth-storage');
+      if (authStorage) {
+        const parsed = JSON.parse(authStorage);
+        token = parsed?.state?.accessToken;
+      }
+    } catch (e) {
+      console.error('❌ [LabManager] Failed to parse auth token:', e);
+    }
+
+    if (!token) {
+      console.error('❌ [LabManager] No access token found');
+      return;
+    }
+
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const socketUrl = apiUrl.replace('/api', '');
+    
+    const socketInstance = io(socketUrl, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    socketInstance.on('connect', () => {
+      console.log('✅ [LabManager] Socket.IO connected!', socketInstance.id);
+      setIsSocketConnected(true);
+    });
+
+    socketInstance.on('disconnect', (reason) => {
+      console.log('❌ [LabManager] Socket.IO disconnected:', reason);
+      setIsSocketConnected(false);
+    });
+
+    socketInstance.on('connect_error', (error) => {
+      console.error('❌ [LabManager] Socket.IO connection error:', error.message);
+      setIsSocketConnected(false);
+    });
+
+    // Listen for equipment status updates
+    socketInstance.on('equipment:status', (data) => {
+      console.log('📡 [LabManager] Equipment status update:', data);
+      handleEquipmentUpdate(data);
+    });
+
+    socketInstance.on('equipment:status:update', (data) => {
+      console.log('📡 [LabManager] Equipment status update (alt):', data);
+      handleEquipmentUpdate(data.status || data);
+    });
+
+    // 🚨 NEW: Listen for new alerts
+    socketInstance.on('alert:new', (alert) => {
+      console.log('🚨 [LabManager] New alert received:', alert);
+      handleNewAlert(alert);
+    });
+
+    setSocket(socketInstance);
+
+    return () => {
+      console.log('🔌 [LabManager] Cleaning up Socket.IO connection');
+      socketInstance.removeAllListeners();
+      socketInstance.disconnect();
+    };
+  }, []);
+
+  // --- HANDLE LIVE EQUIPMENT UPDATES ---
+  const handleEquipmentUpdate = (data) => {
+    const equipmentId = data.equipmentId || data.id;
+    
+    if (!equipmentId) {
+      console.warn('⚠️ [LabManager] No equipmentId in update data', data);
+      return;
+    }
+
+    console.log('🔄 [LabManager] Updating equipment:', equipmentId, 'Status:', data.status);
+
+    // Update live data state
+    setLiveEquipmentData((prev) => ({
+      ...prev,
+      [equipmentId]: {
+        ...data,
+        updatedAt: new Date(),
+      },
+    }));
+
+    // Refresh overview if equipment becomes faulty
+    if (data.status === 'FAULTY') {
+      console.log('⚠️ [LabManager] Equipment became FAULTY, refreshing overview');
+      fetchOverview();
+    }
+  };
+
+  // 🚨 NEW: Handle New Alert
+  const handleNewAlert = (alert) => {
+    console.log('🚨 [LabManager] Processing new alert:', alert);
+    
+    // Add to active alerts if on active tab
+    if (alertTab === 'active') {
+      setActiveAlerts((prev) => {
+        // Check if alert already exists
+        const exists = prev.some(a => a.id === alert.id);
+        if (exists) return prev;
+        
+        // Add new alert to the top
+        return [alert, ...prev];
+      });
+    }
+
+    // Refresh overview to update stats
+    fetchOverview();
+
+    // Show notification (optional)
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('⚠️ Equipment Alert', {
+        body: `${alert.title}: ${alert.equipment?.name}`,
+        icon: '/favicon.ico',
+      });
+    }
+  };
+
+  // Merge live data with equipment list
+  const equipmentWithLiveData = equipment.map((eq) => {
+    const liveData = liveEquipmentData[eq.id];
+    if (!liveData) return eq;
+
+    return {
+      ...eq,
+      status: {
+        ...eq.status,
+        status: liveData.status || eq.status?.status,
+        temperature: liveData.temperature ?? eq.status?.temperature,
+        vibration: liveData.vibration ?? eq.status?.vibration,
+        energyConsumption: liveData.energyConsumption ?? eq.status?.energyConsumption,
+        healthScore: liveData.healthScore ?? eq.status?.healthScore,
+      },
+    };
+  });
 
   // Listener for Sidebar "Add Equipment"
   useEffect(() => {
@@ -202,15 +353,6 @@ export default function LabManagerDashboard() {
       prevBdTrigger.current = triggerBreakdownModal;
     }
   }, [triggerBreakdownModal]);
-
-  // Listener for Sidebar "Log Maintenance" (+ button)
-  useEffect(() => {
-    if ((triggerMaintenanceModal || 0) > prevMaintTrigger.current) {
-      setEquipmentToMaintain(null); // No specific equipment selected
-      setIsMarkMaintenanceModalOpen(true);
-      prevMaintTrigger.current = triggerMaintenanceModal;
-    }
-  }, [triggerMaintenanceModal]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -367,7 +509,6 @@ export default function LabManagerDashboard() {
     }
   };
 
-  // Mark Maintenance Handlers
   const handleMarkMaintenanceClick = (equipment) => {
     setEquipmentToMaintain(equipment);
     setIsMarkMaintenanceModalOpen(true);
@@ -376,12 +517,11 @@ export default function LabManagerDashboard() {
   const handleMarkMaintenanceSuccess = async () => {
     setIsMarkMaintenanceModalOpen(false);
     setEquipmentToMaintain(null);
-    // Reload data to reflect maintenance record
     await loadDashboardData();
   };
 
   const getFilteredEquipment = () => {
-    let filtered = equipment;
+    let filtered = equipmentWithLiveData;
     if (selectedStatus !== "all")
       filtered = filtered.filter((eq) => eq.status?.status === selectedStatus);
     if (searchQuery) {
@@ -499,6 +639,18 @@ export default function LabManagerDashboard() {
                 <FaWrench className="w-4 h-4" />
               </div>
               <h2 className="text-sm font-bold text-gray-800">Breakdowns</h2>
+              {/* Connection Badge */}
+              {isSocketConnected ? (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full border border-green-200">
+                  <FaWifi className="w-2.5 h-2.5" />
+                  Live
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-bold rounded-full border border-gray-200">
+                  <MdOutlineWifiOff className="w-2.5 h-2.5" />
+                  Offline
+                </span>
+              )}
             </div>
             <button
               onClick={() => setIsAddBreakdownModalOpen(true)}

@@ -1,6 +1,6 @@
 /*
  * =====================================================
- * frontend/src/pages/SLDPage.jsx - FIXED CONNECTIONS & ROUTING
+ * frontend/src/pages/SLDPage.jsx - WITH FAULTY EQUIPMENT SUPPORT
  * =====================================================
  */
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
@@ -9,6 +9,7 @@ import { useLabStore } from "../stores/labStore";
 import { useEquipmentStore } from "../stores/equipmentStore";
 import { useInstituteStore } from "../stores/instituteStore";
 import { useSLDLayoutStore } from "../stores/sldLayoutStore";
+import io from "socket.io-client";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import EquipmentNodeComponent from "../components/sld/EquipmentNode";
 import {
@@ -22,6 +23,8 @@ import {
   GripVertical,
   Columns,
   Microscope,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 const DEPARTMENT_DISPLAY_NAMES = {
@@ -36,11 +39,12 @@ const DEPARTMENT_DISPLAY_NAMES = {
   AUTOMOTIVE_MECHANIC: "Automotive/Mechanic",
 };
 
-// Simplified Status Colors - STRICTLY 3 States
+// UPDATED: Added FAULTY status with red color
 const STATUS_COLORS = {
   OPERATIONAL: "bg-emerald-500",
   IN_USE: "bg-blue-500",
   IDLE: "bg-gray-400",
+  FAULTY: "bg-red-500", // NEW
 };
 
 // --- LAYOUT CONSTANTS ---
@@ -48,9 +52,9 @@ const NODE_WIDTH = 140;
 const COLUMN_WIDTH = 200;
 const ROW_HEIGHT = 180;
 const ROOT_WIDTH = 280;
-const ROOT_HEIGHT = 100; // Estimated visual height of root card
-const CANVAS_PADDING = 50; // The +50 offset used in rendering
-const BUS_OFFSET = 40; // Vertical distance from Root bottom to Horizontal Bus
+const ROOT_HEIGHT = 100;
+const CANVAS_PADDING = 50;
+const BUS_OFFSET = 40;
 
 export default function SLDPage() {
   const { user, isLoading: authLoading } = useAuthStore();
@@ -92,15 +96,128 @@ export default function SLDPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // NEW: Socket state
+  const [socket, setSocket] = useState(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [liveEquipmentData, setLiveEquipmentData] = useState({});
+
   const trainerInitializedRef = useRef(false);
+
+  // --- SOCKET.IO CONNECTION ---
+  useEffect(() => {
+    console.log('🔌 [SLD] Setting up Socket.IO connection...');
+
+    let token = null;
+    try {
+      const authStorage = localStorage.getItem('auth-storage');
+      if (authStorage) {
+        const parsed = JSON.parse(authStorage);
+        token = parsed?.state?.accessToken;
+      }
+    } catch (e) {
+      console.error('❌ [SLD] Failed to parse auth token:', e);
+    }
+
+    if (!token) {
+      console.error('❌ [SLD] No access token found');
+      return;
+    }
+
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const socketUrl = apiUrl.replace('/api', '');
+    
+    const socketInstance = io(socketUrl, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    socketInstance.on('connect', () => {
+      console.log('✅ [SLD] Socket.IO connected!', socketInstance.id);
+      setIsSocketConnected(true);
+    });
+
+    socketInstance.on('disconnect', (reason) => {
+      console.log('❌ [SLD] Socket.IO disconnected:', reason);
+      setIsSocketConnected(false);
+    });
+
+    socketInstance.on('connect_error', (error) => {
+      console.error('❌ [SLD] Socket.IO connection error:', error.message);
+      setIsSocketConnected(false);
+    });
+
+    // Listen for equipment status updates
+    socketInstance.on('equipment:status', (data) => {
+      console.log('📡 [SLD] Equipment status update:', data);
+      handleEquipmentUpdate(data);
+    });
+
+    socketInstance.on('equipment:status:update', (data) => {
+      console.log('📡 [SLD] Equipment status update (alt):', data);
+      handleEquipmentUpdate(data.status || data);
+    });
+
+    setSocket(socketInstance);
+
+    return () => {
+      console.log('🔌 [SLD] Cleaning up Socket.IO connection');
+      socketInstance.removeAllListeners();
+      socketInstance.disconnect();
+    };
+  }, []);
+
+  // --- HANDLE LIVE EQUIPMENT UPDATES ---
+  const handleEquipmentUpdate = (data) => {
+    const equipmentId = data.equipmentId || data.id;
+    
+    if (!equipmentId) {
+      console.warn('⚠️ [SLD] No equipmentId in update data', data);
+      return;
+    }
+
+    console.log('🔄 [SLD] Updating equipment:', equipmentId, 'Status:', data.status);
+
+    // Update live data state
+    setLiveEquipmentData((prev) => ({
+      ...prev,
+      [equipmentId]: {
+        ...data,
+        updatedAt: new Date(),
+      },
+    }));
+  };
+
+  // --- Merge live data with equipment list ---
+  const equipmentWithLiveData = useMemo(() => {
+    if (!equipment || equipment.length === 0) return [];
+
+    return equipment.map((eq) => {
+      const liveData = liveEquipmentData[eq.id];
+      if (!liveData) return eq;
+
+      // Merge live data
+      return {
+        ...eq,
+        status: {
+          ...eq.status,
+          status: liveData.status || eq.status?.status,
+          temperature: liveData.temperature ?? eq.status?.temperature,
+          vibration: liveData.vibration ?? eq.status?.vibration,
+          energyConsumption: liveData.energyConsumption ?? eq.status?.energyConsumption,
+          healthScore: liveData.healthScore ?? eq.status?.healthScore,
+        },
+      };
+    });
+  }, [equipment, liveEquipmentData]);
 
   // --- DATA LOADING LOGIC ---
   const loadLabData = useCallback(
     async (labId) => {
       if (!labId || labId === "all") return;
       try {
-        // FIX: Added limit: 1000 to ensure all equipment is fetched.
-        // Without this, default pagination (often 20) limits the view to ~5 rows.
         const equipmentData = await fetchEquipment({ labId, limit: 1000 });
         
         const eqCount = equipmentData?.data?.length || 0;
@@ -219,7 +336,6 @@ export default function SLDPage() {
     loadLabData(selectedLab);
   }, [selectedLab, user, loadLabData]);
 
-  // ... (Computed Values preserved) ...
   const currentLabName = useMemo(() => {
     if (user?.role === "TRAINER") return user.lab?.name || "Assigned Lab";
     const labObj = labs.find((l) => l.labId === selectedLab);
@@ -265,7 +381,7 @@ export default function SLDPage() {
     return filteredLabs;
   }, [labs, selectedInstitute, selectedDepartment, user]);
 
-  // ... (Layout Actions preserved) ...
+  // --- Layout Actions ---
   const saveLayout = async () => {
     try {
       setIsSaving(true);
@@ -333,20 +449,22 @@ export default function SLDPage() {
         return "#10B981";
       case "IN_USE":
         return "#3B82F6";
+      case "FAULTY": // NEW
+        return "#EF4444";
       case "IDLE":
       default:
         return "#9CA3AF";
     }
   };
 
-  // --- REVISED LAYOUT GENERATION ---
+  // --- REVISED LAYOUT GENERATION (Using equipmentWithLiveData) ---
   const generateLayout = () => {
-    if (selectedLab === "all" || equipment.length === 0) {
+    if (selectedLab === "all" || equipmentWithLiveData.length === 0) {
       return { nodes: [], connections: [], totalWidth: 0, totalHeight: 0 };
     }
 
     const positions = { ...equipmentPositions };
-    equipment.forEach((eq, index) => {
+    equipmentWithLiveData.forEach((eq, index) => {
       if (!positions[eq.id]) {
         const col = index % numColumns;
         const row = Math.floor(index / numColumns);
@@ -357,14 +475,12 @@ export default function SLDPage() {
     const maxRow = Math.max(...Object.values(positions).map((p) => p.row), 0);
     const totalWidth = numColumns * COLUMN_WIDTH;
 
-    // Root sits at top
     const rootX = (totalWidth - ROOT_WIDTH) / 2;
     const rootY = 0;
 
-    // Calculate vertical start for equipment (Give space for Root + Bus)
-    const equipmentStartY = rootY + ROOT_HEIGHT + 80; // 180px down from 0
+    const equipmentStartY = rootY + ROOT_HEIGHT + 80;
 
-    const nodes = equipment.map((eq) => {
+    const nodes = equipmentWithLiveData.map((eq) => {
       const pos = positions[eq.id] || { column: 0, row: 0 };
       const x = pos.column * COLUMN_WIDTH + (COLUMN_WIDTH - NODE_WIDTH) / 2;
       const y = equipmentStartY + pos.row * ROW_HEIGHT;
@@ -378,16 +494,12 @@ export default function SLDPage() {
       };
     });
 
-    // --- CONNECTION LOGIC ---
     const connections = nodes.map((node) => {
-      // Start: Bottom center of Root Node
       const startX = rootX + ROOT_WIDTH / 2;
-      const startY = rootY + ROOT_HEIGHT; // Exact bottom of visual card
+      const startY = rootY + ROOT_HEIGHT;
 
-      // Bus: Horizontal line level
       const busY = startY + BUS_OFFSET;
 
-      // End: Top center of Equipment Node
       const endX = node.x + NODE_WIDTH / 2;
       const endY = node.y;
 
@@ -411,30 +523,25 @@ export default function SLDPage() {
       rootX,
       rootY,
       totalWidth,
-      // Ensure height accommodates all rows plus padding
       totalHeight: equipmentStartY + (maxRow + 1) * ROW_HEIGHT,
     };
   };
 
   const layout = generateLayout();
 
-  // Helper for Rounded Orthogonal Paths
   const getSmoothPath = (x1, y1, busY, x2, y2) => {
-    // Add canvas padding offset to all coordinates for rendering
     const sx = x1 + CANVAS_PADDING;
     const sy = y1 + CANVAS_PADDING;
     const by = busY + CANVAS_PADDING;
     const ex = x2 + CANVAS_PADDING;
     const ey = y2 + CANVAS_PADDING;
 
-    const r = 12; // Radius size
+    const r = 12;
 
-    // Case 1: Straight vertical drop (rare, if perfectly aligned)
     if (Math.abs(sx - ex) < 1) {
       return `M ${sx} ${sy} L ${ex} ${ey}`;
     }
 
-    // Case 2: Standard Bus Route (Down -> Horizontal -> Down)
     const xDir = ex > sx ? 1 : -1;
 
     return `
@@ -476,9 +583,23 @@ export default function SLDPage() {
       {/* HEADER & FILTERS */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Single Line Diagram (SLD)
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Single Line Diagram (SLD)
+            </h1>
+            {/* Connection Indicator */}
+            {isSocketConnected ? (
+              <span className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full border border-green-200">
+                <Wifi className="w-3 h-3" />
+                Live
+              </span>
+            ) : (
+              <span className="flex items-center gap-2 px-3 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full border border-gray-200">
+                <WifiOff className="w-3 h-3" />
+                Offline
+              </span>
+            )}
+          </div>
           {user?.role === "TRAINER" && (
             <p className="text-gray-500 mt-1 flex items-center gap-2 animate-fadeIn">
               <Microscope className="text-blue-500 w-5 h-5" />
@@ -489,7 +610,7 @@ export default function SLDPage() {
             </p>
           )}
         </div>
-        {canEdit && selectedLab !== "all" && equipment.length > 0 && (
+        {canEdit && selectedLab !== "all" && equipmentWithLiveData.length > 0 && (
           <div className="flex gap-2">
             {isEditMode ? (
               <>
@@ -616,7 +737,7 @@ export default function SLDPage() {
         </div>
       )}
 
-      {/* LEGEND */}
+      {/* LEGEND - UPDATED WITH FAULTY */}
       <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
         <h3 className="font-semibold text-gray-900 mb-3">Status Legend</h3>
         <div className="flex flex-wrap gap-4">
@@ -637,11 +758,11 @@ export default function SLDPage() {
           <div className="flex justify-center items-center min-h-[600px] w-full">
             <LoadingSpinner size="lg" />
           </div>
-        ) : selectedLab === "all" || equipment.length === 0 ? (
+        ) : selectedLab === "all" || equipmentWithLiveData.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[600px] w-full text-gray-500">
             <AlertCircle className="w-16 h-16 text-gray-300 mb-4" />
             <p className="text-lg">
-              {equipment.length === 0 && selectedLab !== "all"
+              {equipmentWithLiveData.length === 0 && selectedLab !== "all"
                 ? "No equipment found in this lab"
                 : "Select a lab to view equipment layout"}
             </p>
