@@ -3,13 +3,13 @@
  * frontend/src/components/sld/EquipmentNode.jsx
  * =====================================================
  * Updated to support 'FAULTY' status for Real-Time monitoring
+ * Updated with Modal for equipment details
  */
 import { useState, memo } from "react";
 import {
   Activity,
   CheckCircle,
   Clock,
-  ChevronDown,
   X,
   AlertTriangle,
   GraduationCap,
@@ -72,8 +72,7 @@ const getDisplayStatus = (backendStatus) => {
   return "IDLE";
 };
 
-function EquipmentNodeComponent({ data }) {
-  const [showDetails, setShowDetails] = useState(false);
+function EquipmentNodeComponent({ data, onOpenModal }) {
   const equipment = data.equipment;
 
   // 1. Get Normalized Status Key
@@ -94,14 +93,11 @@ function EquipmentNodeComponent({ data }) {
   };
 
   return (
-    // WRAPPER: Handles positioning and click events, but allows overflow
     <div
       className="relative group"
-      onClick={() => setShowDetails(!showDetails)}
+      onClick={() => onOpenModal(equipment)}
     >
-      {/* MAIN CARD: Keeps overflow-hidden so the colored status bar 
-          doesn't bleed out of the rounded corners 
-      */}
+      {/* MAIN CARD - same as before */}
       <div
         className={`
           relative w-[140px] bg-white rounded-lg border-2 ${config.borderColor}
@@ -149,144 +145,13 @@ function EquipmentNodeComponent({ data }) {
             </div>
           </div>
         </div>
-
-        {/* Expand Indicator */}
-        <div className="absolute bottom-1 right-1">
-          <ChevronDown
-            className={`w-3 h-3 text-gray-400 transition-transform ${
-              showDetails ? "rotate-180" : ""
-            }`}
-          />
-        </div>
       </div>
 
-      {/* BADGE: Placed OUTSIDE the card container so it isn't clipped.
-          -top-2 -right-2 positions it cleanly on the corner.
-          z-10 ensures it sits on top of everything.
-      */}
+      {/* Alert Badge */}
       {unresolvedAlerts > 0 && (
         <div className="absolute -top-2 -right-2 z-10 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-sm ring-2 ring-white">
           {unresolvedAlerts}
         </div>
-      )}
-
-      {/* Details Popup */}
-      {showDetails && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDetails(false);
-            }}
-          />
-
-          {/* Popup */}
-          <div
-            className="absolute z-50 top-full left-1/2 transform -translate-x-1/2 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-4 cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowDetails(false)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="space-y-3">
-              <div>
-                <h4 className="font-bold text-base text-gray-900">
-                  {equipment.name}
-                </h4>
-                <p className="text-xs text-gray-500 font-mono">
-                  {equipment.equipmentId}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <p className="text-gray-500">Manufacturer</p>
-                  <p className="font-medium text-gray-900">
-                    {equipment.manufacturer}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Model</p>
-                  <p className="font-medium text-gray-900">{equipment.model}</p>
-                </div>
-              </div>
-
-              {equipment.serialNumber && (
-                <div className="text-xs">
-                  <p className="text-gray-500">Serial Number</p>
-                  <p className="font-medium font-mono text-gray-900">
-                    {equipment.serialNumber}
-                  </p>
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-gray-100 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-600">Status</span>
-                  <div className="flex items-center gap-1.5">
-                    <StatusIcon className={`w-3.5 h-3.5 ${config.textColor}`} />
-                    <span
-                      className={`text-xs font-semibold ${config.textColor}`}
-                    >
-                      {config.label}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-600">Health Score</span>
-                  <span
-                    className={`text-sm font-bold ${getHealthColor(
-                      healthScore
-                    )}`}
-                  >
-                    {healthScore.toFixed(1)}%
-                  </span>
-                </div>
-
-                {equipment.status?.temperature && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600">Temperature</span>
-                    <span className="text-xs font-medium text-gray-900">
-                      {equipment.status.temperature.toFixed(1)}°C
-                    </span>
-                  </div>
-                )}
-
-                {equipment.status?.isOperatingInClass && (
-                  <div className="flex items-center gap-2 bg-purple-50 p-2 rounded text-xs">
-                    <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
-                    <span className="text-purple-700 font-medium">
-                      In class session
-                    </span>
-                  </div>
-                )}
-
-                {unresolvedAlerts > 0 && (
-                  <div className="flex items-center gap-2 bg-red-50 p-2 rounded text-xs">
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-                    <span className="text-red-700 font-medium">
-                      {unresolvedAlerts} alert{unresolvedAlerts > 1 ? "s" : ""}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {equipment.status?.lastUsedAt && (
-                <div className="text-[10px] text-gray-500 pt-2 border-t border-gray-100">
-                  Last used:{" "}
-                  {new Date(equipment.status.lastUsedAt).toLocaleString()}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
       )}
     </div>
   );

@@ -60,26 +60,26 @@ export default function BreakdownEquipmentTable({
 
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
+      <div className="w-full">
+        <table className="w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
                 Equipment
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Lab
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/8">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
                 Reason
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/8">
                 Reported
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Actions
               </th>
             </tr>
@@ -91,56 +91,56 @@ export default function BreakdownEquipmentTable({
 
               return (
                 <tr key={breakdown.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4">
                     <div className="flex items-center">
-                      <FaExclamationCircle className="w-5 h-5 text-red-500 mr-2" />
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
+                      <FaExclamationCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
                           {equipment.name}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 truncate">
                           {equipment.equipmentId}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
+                  <td className="px-4 py-4">
+                    <div className="text-sm text-gray-900 truncate max-w-[425px]">
                       {equipment.lab.name}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 truncate max-w-[425px]">
                       {equipment.lab.institute?.name ||
                         equipment.lab.instituteId}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4">
                     <span
-                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${
+                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border whitespace-nowrap ${
                         STATUS_COLORS[breakdown.status]
                       }`}
                     >
                       {STATUS_LABELS[breakdown.status]}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4">
                     <div className="text-sm text-gray-900 max-w-xs truncate">
                       {breakdown.reason}
                     </div>
                     {breakdown.isAutoDetected && (
-                      <span className="text-xs text-blue-600">
+                      <span className="text-xs text-blue-600 whitespace-nowrap">
                         Auto-detected
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-4 text-sm text-gray-500 whitespace-nowrap">
                     {new Date(breakdown.reportedAt).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
+                  <td className="px-4 py-4 text-sm font-medium">
+                    <div className="flex flex-col gap-2 min-w-[120px]">
                       {breakdown.status === "REPORTED" && (
                         <button
                           onClick={() => handleReorderClick(breakdown)}
-                          className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                          className="text-blue-600 hover:text-blue-900 flex items-center gap-1 whitespace-nowrap"
                         >
                           <FaBox className="w-4 h-4" />
                           Reorder
@@ -150,7 +150,7 @@ export default function BreakdownEquipmentTable({
                       {latestRequest && (
                         <div className="text-xs">
                           <span
-                            className={`px-2 py-1 rounded ${
+                            className={`px-2 py-1 rounded whitespace-nowrap ${
                               latestRequest.status === "APPROVED"
                                 ? "bg-green-100 text-green-800"
                                 : latestRequest.status === "REJECTED"
@@ -166,7 +166,7 @@ export default function BreakdownEquipmentTable({
                       {breakdown.status === "REORDER_APPROVED" && (
                         <button
                           onClick={() => onResolve(breakdown.id)}
-                          className="text-green-600 hover:text-green-900 flex items-center gap-1"
+                          className="text-green-600 hover:text-green-900 flex items-center gap-1 whitespace-nowrap"
                         >
                           <FaCheckCircle className="w-4 h-4" />
                           Resolve

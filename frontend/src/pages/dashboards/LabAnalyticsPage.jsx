@@ -475,24 +475,43 @@ export default function LabAnalyticsPage() {
               </div>
             </div>
 
-            {/* Health Chart - Horizontal Scroll */}
+            {/* Health Chart - Fixed Width, Dynamic Bars */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2 flex flex-col">
               <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <BarChart3 className="text-green-500 w-5 h-5"/> Health & Efficiency
               </h3>
-              <div className="h-[300px] overflow-x-auto overflow-y-hidden custom-scrollbar">
-                <div style={{ width: `${getChartWidth(chartData.healthScoreData.length)}%`, minWidth: '100%', height: '100%' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.healthScoreData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey="shortName" angle={-20} textAnchor="end" height={60} tick={{ fontSize: 11 }} interval={0} />
-                        <YAxis tick={{ fontSize: 11 }} />
-                        <Tooltip />
-                        <Bar dataKey="healthScore" fill="#10B981" name="Health Score" />
-                        <Bar dataKey="efficiency" fill="#3B82F6" name="Efficiency %" />
-                    </BarChart>
-                    </ResponsiveContainer>
-                </div>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={chartData.healthScoreData} 
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    barCategoryGap={chartData.healthScoreData.length > 15 ? '5%' : chartData.healthScoreData.length > 10 ? '10%' : '15%'}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="shortName" 
+                      angle={chartData.healthScoreData.length > 10 ? -45 : -20} 
+                      textAnchor="end" 
+                      height={60} 
+                      tick={{ fontSize: chartData.healthScoreData.length > 15 ? 9 : 11 }} 
+                      interval={0} 
+                    />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar 
+                      dataKey="healthScore" 
+                      fill="#10B981" 
+                      name="Health Score"
+                      maxBarSize={chartData.healthScoreData.length > 15 ? 20 : chartData.healthScoreData.length > 10 ? 30 : 50}
+                    />
+                    <Bar 
+                      dataKey="efficiency" 
+                      fill="#3B82F6" 
+                      name="Efficiency %"
+                      maxBarSize={chartData.healthScoreData.length > 15 ? 20 : chartData.healthScoreData.length > 10 ? 30 : 50}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>

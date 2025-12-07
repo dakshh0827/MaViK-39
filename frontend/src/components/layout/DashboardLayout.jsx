@@ -12,8 +12,9 @@ import {
   FaUniversity,
   FaBuilding,
   FaDesktop,
-  FaExclamationTriangle,
+  FaExclamationTriangle
 } from "react-icons/fa";
+import { ImLab } from "react-icons/im";
 import { useState, useEffect, useRef } from "react";
 import { useAuthStore } from "../../stores/authStore";
 
@@ -40,9 +41,9 @@ export default function DashboardLayout() {
   // Ref for the quick menu container
   const quickMenuRef = useRef(null);
 
-  // --- N8N CHATBOT INTEGRATION (UPDATED UI) ---
+  // --- N8N CHATBOT INTEGRATION (UPDATED URL) ---
   useEffect(() => {
-    // 1. Inject Styles for Floating Widget (Base Styles)
+    // 1. Inject Styles for Floating Widget
     if (!document.getElementById("n8n-chat-style")) {
       const link = document.createElement("link");
       link.id = "n8n-chat-style";
@@ -70,7 +71,7 @@ export default function DashboardLayout() {
       document.head.appendChild(style);
     }
 
-    // 3. Inject Script for Floating Widget with Custom UI Config
+    // 3. Inject Script for Floating Widget with Custom UI Config & Updated Webhook
     if (!document.getElementById("n8n-chat-script")) {
       const script = document.createElement("script");
       script.id = "n8n-chat-script";
@@ -79,7 +80,7 @@ export default function DashboardLayout() {
         import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
         
         createChat({
-          webhookUrl: 'https://aryaa2525.app.n8n.cloud/webhook/55d1251c-a027-43a2-ab26-ddfa93b742fd/chat',
+          webhookUrl: 'https://aaryannn1234.app.n8n.cloud/webhook/55d1251c-a027-43a2-ab26-ddfa93b742fd/chat',
           showWelcomeScreen: false,
           initialMessages: [
             'Hi there!',
@@ -94,8 +95,8 @@ export default function DashboardLayout() {
             }
           },
           style: {
-            accentColor: '#155dfc', // Updated Icon/Button Color
-            background: '#ffffff', // Distinct White Background
+            accentColor: '#155dfc', // Blue Theme
+            background: '#ffffff', // White Background
             color: '#1e293b',
           }
         });
@@ -111,6 +112,7 @@ export default function DashboardLayout() {
       if (!styleTag) {
         styleTag = document.createElement("style");
         styleTag.id = styleId;
+        // Use !important to override the library's inline styles
         styleTag.innerHTML = `
           .n8n-chat { display: none !important; }
         `;
@@ -184,7 +186,7 @@ export default function DashboardLayout() {
             className="w-full flex items-center gap-3 p-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors text-left"
           >
             <div className="p-1.5 bg-blue-100 text-blue-800 rounded-md">
-              <FaBuilding size={18} />
+              <ImLab size={18} />
             </div>
             <span>Add New Lab</span>
           </button>
@@ -195,6 +197,19 @@ export default function DashboardLayout() {
     if (role === "LAB_MANAGER") {
       return (
         <>
+          <button
+            onClick={() => {
+              setIsLabModalOpen(true);
+              setIsQuickMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-3 p-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors text-left"
+          >
+            <div className="p-1.5 bg-blue-100 text-blue-800 rounded-md">
+              <ImLab size={18} />
+            </div>
+            <span>Add New Lab</span>
+          </button>
+
           <button
             onClick={() => {
               setTriggerEquipmentModal((prev) => prev + 1);
@@ -350,7 +365,9 @@ export default function DashboardLayout() {
           transition: "left 0.3s ease",
         }}
       >
-        <h1 className="text-2xl font-bold text-blue-600">MaViK-39</h1>
+        <h1 className="text-2xl font-bold text-blue-600">
+          MaViK-39
+        </h1>
 
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600 hidden sm:block">

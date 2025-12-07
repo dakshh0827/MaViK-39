@@ -1,43 +1,3 @@
-// // =====================================================
-// // 7. src/stores/chatbotStore.js
-// // =====================================================
-
-// import { create } from "zustand";
-// import api from "../lib/axios";
-
-// export const useChatbotStore = create((set) => ({
-//   messages: [],
-//   isLoading: false,
-
-//   fetchHistory: async () => {
-//     try {
-//       const response = await api.get("/chatbot/history");
-//       set({ messages: response.data.data });
-//       return response.data;
-//     } catch (error) {
-//       throw error;
-//     }
-//   },
-
-//   sendMessage: async (message) => {
-//     set({ isLoading: true });
-//     try {
-//       const response = await api.post("/chatbot/message", { message });
-//       set((state) => ({
-//         messages: [...state.messages, response.data.data],
-//         isLoading: false,
-//       }));
-//       return response.data;
-//     } catch (error) {
-//       set({ isLoading: false });
-//       throw error;
-//     }
-//   },
-// }));
-
-
-
-
 // =====================================================
 // src/stores/chatbotStore.js
 // =====================================================
@@ -45,8 +5,8 @@
 import { create } from "zustand";
 import { v4 as uuidv4 } from "uuid";
 
-// Your n8n Webhook URL
-const WEBHOOK_URL = "https://aryaa2525.app.n8n.cloud/webhook/55d1251c-a027-43a2-ab26-ddfa93b742fd/chat";
+// Updated n8n Webhook URL
+const WEBHOOK_URL = "https://aaryannn1234.app.n8n.cloud/webhook/55d1251c-a027-43a2-ab26-ddfa93b742fd/chat";
 
 export const useChatbotStore = create((set, get) => ({
   messages: [],
@@ -75,20 +35,16 @@ export const useChatbotStore = create((set, get) => ({
       
       if (response.ok) {
         const data = await response.json();
-        // Transform n8n history format (usually array of objects) to our UI format
-        // Expected n8n format: [{ role: 'user', text: '...' }, { role: 'assistant', text: '...' }]
         // UI format: [{ message: "User msg", response: "Bot response" }]
         
         const uiMessages = [];
         let currentPair = {};
 
-        // Simple parser to pair user/assistant messages
-        // This depends on exactly how your n8n workflow returns history. 
-        // If n8n returns raw list, we pair them up.
         if (Array.isArray(data)) {
             data.forEach(msg => {
+                // Adjust based on how your specific n8n workflow returns roles
                 if (msg.role === 'user' || msg.type === 'human') {
-                    if (currentPair.message) uiMessages.push(currentPair); // push previous if exists
+                    if (currentPair.message) uiMessages.push(currentPair); 
                     currentPair = { message: msg.text || msg.content };
                 } else {
                     currentPair.response = msg.text || msg.content;
@@ -105,7 +61,6 @@ export const useChatbotStore = create((set, get) => ({
             set({ isLoading: false }); 
         }
       } else {
-        // Fallback or empty if history endpoint not configured
         set({ isLoading: false });
       }
     } catch (error) {
@@ -139,15 +94,13 @@ export const useChatbotStore = create((set, get) => ({
       const data = await response.json();
       
       // Parse n8n response
-      // Usually n8n chat node returns: { data: "Response text" } or array
-      // Adjust 'output' access based on your specific n8n workflow response node
       let botResponse = "I received your message but couldn't process the response.";
       
       if (data && typeof data === 'object') {
           if (data.output) botResponse = data.output;
           else if (data.text) botResponse = data.text;
           else if (Array.isArray(data) && data[0]?.output) botResponse = data[0].output;
-          else if (data.data) botResponse = data.data; // Common default
+          else if (data.data) botResponse = data.data; 
       }
 
       set((state) => ({

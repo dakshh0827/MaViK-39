@@ -7,8 +7,7 @@ import { useState } from "react";
 import { 
   FaEdit, 
   FaTrash, 
-  FaEye, 
-  FaEllipsisV,
+  FaEye,
   FaExclamationCircle,
   FaCheckCircle,
   FaClock,
@@ -75,14 +74,7 @@ export default function EquipmentTable({
   onView,
   showActions = false 
 }) {
-  const [activeMenu, setActiveMenu] = useState(null);
-
-  const handleMenuToggle = (equipmentId) => {
-    setActiveMenu(activeMenu === equipmentId ? null : equipmentId);
-  };
-
   const handleAction = (action, item) => {
-    setActiveMenu(null);
     if (action === 'edit' && onEdit) {
       onEdit(item);
     } else if (action === 'delete' && onDelete) {
@@ -155,7 +147,7 @@ export default function EquipmentTable({
             return (
               <tr 
                 key={item.id} 
-                className="hover:bg-gray-50 transition-colors"
+                className="hover:bg-gray-50 transition-colors group"
               >
                 <td className="px-4 py-4">
                   <div>
@@ -171,9 +163,6 @@ export default function EquipmentTable({
                 <td className="px-4 py-4">
                   <div className="text-sm">
                     <div className="text-gray-900">{item.lab?.name || "N/A"}</div>
-                    {/* <div className="text-gray-500 text-xs">
-                      {getInstituteName(item.lab?.institute)}
-                    </div> */}
                   </div>
                 </td>
 
@@ -220,51 +209,36 @@ export default function EquipmentTable({
                 </td>
 
                 {showActions && (
-                  <td className="px-4 py-4 text-right relative">
-                    <button
-                      onClick={() => handleMenuToggle(item.id)}
-                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                    >
-                      <FaEllipsisV className="w-4 h-4 text-gray-600" />
-                    </button>
-
-                    {activeMenu === item.id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setActiveMenu(null)}
-                        />
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                          {onView && (
-                            <button
-                              onClick={() => handleAction('view', item)}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <FaEye className="w-4 h-4" />
-                              View Details
-                            </button>
-                          )}
-                          {onEdit && (
-                            <button
-                              onClick={() => handleAction('edit', item)}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <FaEdit className="w-4 h-4" />
-                              Edit
-                            </button>
-                          )}
-                          {onDelete && (
-                            <button
-                              onClick={() => handleAction('delete', item)}
-                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                            >
-                              <FaTrash className="w-4 h-4" />
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </>
-                    )}
+                  <td className="px-4 py-4 text-right">
+                    <div className="flex gap-2 justify-end items-center group-hover:opacity-100 transition-opacity">
+                      {onView && (
+                        <button
+                          onClick={() => handleAction('view', item)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="View Details"
+                        >
+                          <FaEye className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onEdit && (
+                        <button
+                          onClick={() => handleAction('edit', item)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit Equipment"
+                        >
+                          <FaEdit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          onClick={() => handleAction('delete', item)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Delete Equipment"
+                        >
+                          <FaTrash className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>

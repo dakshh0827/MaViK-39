@@ -37,8 +37,11 @@ export default function AddBreakdownModal({ isOpen, onClose, onSubmit }) {
     setIsSubmitting(true);
     try {
       await onSubmit(selectedEquipmentId, reason);
+      // Reset form fields
       setSelectedEquipmentId("");
       setReason("");
+      setError("");
+      // Close modal immediately after successful submission
       onClose();
     } catch (err) {
       setError(err.message || "Failed to add breakdown equipment");
