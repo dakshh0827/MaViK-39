@@ -38,25 +38,54 @@ const DEPARTMENT_DISPLAY_NAMES = {
 };
 
 // --- CSS STYLE TO FORCE-FIX CHILD MODALS ---
+// --- CSS STYLE TO FORCE-FIX CHILD MODALS ---
 const modalStripperStyle = `
-  .modal-stripper * {
+  /* Reset any problematic positioning from child components */
+  .policy-modal-wrapper * {
     position: static !important;
   }
-  .modal-stripper > *:last-child {
+  
+  /* Allow the main content container to be positioned */
+  .policy-modal-wrapper .policy-modal-content {
     position: relative !important;
+    z-index: 10 !important;
   }
-  .modal-stripper div[class*="fixed"],
-  .modal-stripper div[class*="absolute"],
-  .modal-stripper div[class*="inset"],
-  .modal-stripper div[class*="bg-black"],
-  .modal-stripper div[class*="bg-gray-900"],
-  .modal-stripper div[class*="bg-slate"] {
-    background-color: transparent !important;
+  
+  /* Remove any backdrop/overlay effects from child components */
+  .policy-modal-wrapper div[class*="fixed"]:not(.policy-modal-backdrop),
+  .policy-modal-wrapper div[class*="absolute"]:not(.policy-modal-backdrop),
+  .policy-modal-wrapper div[class*="inset"]:not(.policy-modal-backdrop) {
+    position: static !important;
+  }
+  
+  /* Force remove any dark overlays from child components */
+  .policy-modal-wrapper > div > div[class*="bg-black"],
+  .policy-modal-wrapper > div > div[class*="bg-gray-900"],
+  .policy-modal-wrapper > div > div[class*="bg-slate"],
+  .policy-modal-wrapper > div > div[style*="backdrop"] {
+    background: transparent !important;
     backdrop-filter: none !important;
+    background-color: transparent !important;
   }
-  .modal-stripper::before,
-  .modal-stripper::after {
-    display: none !important;
+  
+  /* Ensure the modal content is fully opaque with white background */
+  .policy-modal-content {
+    background-color: white !important;
+    opacity: 1 !important;
+  }
+  
+  .policy-modal-content * {
+    opacity: 1 !important;
+  }
+  
+  /* Ensure backdrop stays behind everything */
+  .policy-modal-backdrop::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 1;
   }
 `;
 
@@ -71,15 +100,17 @@ const ModalWrapper = ({ children, onClose }) => {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-md transition-all animate-in fade-in duration-200"
+      className="policy-modal-backdrop fixed inset-0 flex items-center justify-center transition-all animate-in fade-in duration-200"
       onClick={onClose}
     >
       <style>{modalStripperStyle}</style>
       <div
-        className="modal-stripper relative w-auto max-w-4xl max-h-[90vh] overflow-y-auto p-4 flex flex-col items-center justify-center"
+        className="policy-modal-wrapper relative w-auto max-w-4xl max-h-[90vh] overflow-y-auto p-4 z-10"
         onClick={(e) => e.stopPropagation()}
       >
-        {children}
+        <div className="policy-modal-content w-full bg-white rounded-xl shadow-2xl">
+          {children}
+        </div>
       </div>
     </div>,
     document.body

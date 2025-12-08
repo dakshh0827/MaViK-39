@@ -12,7 +12,7 @@ import {
   FaUniversity,
   FaBuilding,
   FaDesktop,
-  FaExclamationTriangle
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import { ImLab } from "react-icons/im";
 import { useState, useEffect, useRef } from "react";
@@ -41,9 +41,11 @@ export default function DashboardLayout() {
   // Ref for the quick menu container
   const quickMenuRef = useRef(null);
 
-  // --- N8N CHATBOT INTEGRATION (UPDATED URL) ---
+  // --- N8N CHATBOT INTEGRATION ---
+
+  // 1. Initialization & Cleanup (Runs ONCE on mount/unmount)
   useEffect(() => {
-    // 1. Inject Styles for Floating Widget
+    // Inject Styles for Floating Widget
     if (!document.getElementById("n8n-chat-style")) {
       const link = document.createElement("link");
       link.id = "n8n-chat-style";
@@ -52,7 +54,7 @@ export default function DashboardLayout() {
       document.head.appendChild(link);
     }
 
-    // 2. Inject Custom CSS for Font Size & Separation
+    // Inject Custom CSS
     if (!document.getElementById("n8n-chat-custom-css")) {
       const style = document.createElement("style");
       style.id = "n8n-chat-custom-css";
@@ -66,12 +68,13 @@ export default function DashboardLayout() {
         }
         .n8n-chat-widget {
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+          z-index: 9999 !important; /* Ensure it stays on top */
         }
       `;
       document.head.appendChild(style);
     }
 
-    // 3. Inject Script for Floating Widget with Custom UI Config & Updated Webhook
+    // Inject Script
     if (!document.getElementById("n8n-chat-script")) {
       const script = document.createElement("script");
       script.id = "n8n-chat-script";
@@ -95,8 +98,8 @@ export default function DashboardLayout() {
             }
           },
           style: {
-            accentColor: '#155dfc', // Blue Theme
-            background: '#ffffff', // White Background
+            accentColor: '#155dfc',
+            background: '#ffffff',
             color: '#1e293b',
           }
         });
@@ -104,29 +107,54 @@ export default function DashboardLayout() {
       document.body.appendChild(script);
     }
 
-    // 4. Toggle Visibility based on Route
+    // --- CLEANUP FUNCTION ---
+    // This runs automatically when the user leaves the DashboardLayout (e.g., Logout)
+    return () => {
+      // Remove Script and Styles
+      document.getElementById("n8n-chat-script")?.remove();
+      document.getElementById("n8n-chat-style")?.remove();
+      document.getElementById("n8n-chat-custom-css")?.remove();
+
+      // Remove the actual Chat Widget from DOM
+      // The library usually attaches a div with class 'n8n-chat-widget' to body
+      const widget = document.querySelector(".n8n-chat-widget");
+      if (widget) {
+        widget.remove();
+      }
+
+      // Safety check: sometimes it creates a different container, remove that too if found
+      const chatRoot = document.querySelector(".n8n-chat");
+      if (chatRoot) {
+        chatRoot.remove();
+      }
+    };
+  }, []); // Empty dependency array ensures this only runs on Mount/Unmount
+
+  // 2. Visibility Toggle based on Route (Runs on every route change)
+  useEffect(() => {
     const styleId = "n8n-chat-toggle-style";
     let styleTag = document.getElementById(styleId);
 
+    // If we are on the dedicated Chatbot page, hide the floating widget
     if (location.pathname === "/chatbot") {
       if (!styleTag) {
         styleTag = document.createElement("style");
         styleTag.id = styleId;
-        // Use !important to override the library's inline styles
         styleTag.innerHTML = `
-          .n8n-chat { display: none !important; }
+          .n8n-chat-widget { display: none !important; }
         `;
         document.head.appendChild(styleTag);
       }
     } else {
+      // If we are elsewhere in the dashboard, ensure the widget is visible
       if (styleTag) {
         styleTag.remove();
       }
     }
-
   }, [location.pathname]);
 
-  // Close quick menu when clicking outside
+  // --- REST OF YOUR COMPONENT LOGIC ---
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -147,6 +175,7 @@ export default function DashboardLayout() {
   const handleLogout = () => {
     logout();
     navigate("/login");
+    // Note: The useEffect cleanup above will handle removing the chatbot
   };
 
   const navItems = [
@@ -161,7 +190,6 @@ export default function DashboardLayout() {
   const sidebarWidth = isSidebarCollapsed ? "5rem" : "16rem";
   const role = user?.role;
 
-  // Render Quick Action Options based on Role
   const renderQuickActions = () => {
     if (role === "POLICY_MAKER") {
       return (
@@ -365,9 +393,7 @@ export default function DashboardLayout() {
           transition: "left 0.3s ease",
         }}
       >
-        <h1 className="text-2xl font-bold text-blue-600">
-          MaViK-39
-        </h1>
+        <h1 className="text-2xl font-bold text-blue-600">MaViK-39</h1>
 
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600 hidden sm:block">
