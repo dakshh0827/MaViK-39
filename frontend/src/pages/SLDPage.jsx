@@ -1,7 +1,8 @@
 /*
  * =====================================================
- * frontend/src/pages/SLDPage.jsx - WITH FAULTY EQUIPMENT SUPPORT
+ * frontend/src/pages/SLDPage.jsx
  * =====================================================
+ * Updated: Root Node shows Lab ID, Count pinned to canvas corner
  */
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useAuthStore } from "../stores/authStore";
@@ -25,11 +26,8 @@ import {
   Microscope,
   Wifi,
   WifiOff,
-  Activity,
-  CheckCircle,
-  Clock,
   GraduationCap,
-  AlertTriangle,
+  LayoutGrid,
 } from "lucide-react";
 
 const DEPARTMENT_DISPLAY_NAMES = {
@@ -44,22 +42,15 @@ const DEPARTMENT_DISPLAY_NAMES = {
   AUTOMOTIVE_MECHANIC: "Automotive/Mechanic",
 };
 
-// UPDATED: Added FAULTY status with red color
-const STATUS_COLORS = {
-  OPERATIONAL: "bg-emerald-500",
-  IN_USE: "bg-blue-500",
-  IDLE: "bg-gray-400",
-  FAULTY: "bg-red-500", // NEW
-};
-
 // --- LAYOUT CONSTANTS ---
-const NODE_WIDTH = 140;
-const COLUMN_WIDTH = 200;
-const ROW_HEIGHT = 180;
+const NODE_WIDTH = 210;
+const NODE_HEIGHT = 46;
+const COLUMN_WIDTH = 260;
+const ROW_HEIGHT = 100;
 const ROOT_WIDTH = 280;
-const ROOT_HEIGHT = 100;
+const ROOT_HEIGHT = 80; // Reduced height slightly as text is smaller/cleaner
 const CANVAS_PADDING = 50;
-const BUS_OFFSET = 40;
+const BUS_OFFSET = 60;
 
 export default function SLDPage() {
   const { user, isLoading: authLoading } = useAuthStore();
@@ -100,9 +91,10 @@ export default function SLDPage() {
   const [equipmentPositions, setEquipmentPositions] = useState({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedEquipmentForModal, setSelectedEquipmentForModal] = useState(null);
+  const [selectedEquipmentForModal, setSelectedEquipmentForModal] =
+    useState(null);
 
-  // NEW: Socket state
+  // Socket state
   const [socket, setSocket] = useState(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [liveEquipmentData, setLiveEquipmentData] = useState({});
@@ -111,82 +103,71 @@ export default function SLDPage() {
 
   // --- SOCKET.IO CONNECTION ---
   useEffect(() => {
-    console.log('🔌 [SLD] Setting up Socket.IO connection...');
+    console.log("🔌 [SLD] Setting up Socket.IO connection...");
 
     let token = null;
     try {
-      const authStorage = localStorage.getItem('auth-storage');
+      const authStorage = localStorage.getItem("auth-storage");
       if (authStorage) {
         const parsed = JSON.parse(authStorage);
         token = parsed?.state?.accessToken;
       }
     } catch (e) {
-      console.error('❌ [SLD] Failed to parse auth token:', e);
+      console.error("❌ [SLD] Failed to parse auth token:", e);
     }
 
     if (!token) {
-      console.error('❌ [SLD] No access token found');
+      console.error("❌ [SLD] No access token found");
       return;
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const socketUrl = apiUrl.replace('/api', '');
-    
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    const socketUrl = apiUrl.replace("/api", "");
+
     const socketInstance = io(socketUrl, {
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
 
-    socketInstance.on('connect', () => {
-      console.log('✅ [SLD] Socket.IO connected!', socketInstance.id);
+    socketInstance.on("connect", () => {
+      console.log("✅ [SLD] Socket.IO connected!", socketInstance.id);
       setIsSocketConnected(true);
     });
 
-    socketInstance.on('disconnect', (reason) => {
-      console.log('❌ [SLD] Socket.IO disconnected:', reason);
+    socketInstance.on("disconnect", (reason) => {
+      console.log("❌ [SLD] Socket.IO disconnected:", reason);
       setIsSocketConnected(false);
     });
 
-    socketInstance.on('connect_error', (error) => {
-      console.error('❌ [SLD] Socket.IO connection error:', error.message);
+    socketInstance.on("connect_error", (error) => {
+      console.error("❌ [SLD] Socket.IO connection error:", error.message);
       setIsSocketConnected(false);
     });
 
-    // Listen for equipment status updates
-    socketInstance.on('equipment:status', (data) => {
-      console.log('📡 [SLD] Equipment status update:', data);
+    socketInstance.on("equipment:status", (data) => {
       handleEquipmentUpdate(data);
     });
 
-    socketInstance.on('equipment:status:update', (data) => {
-      console.log('📡 [SLD] Equipment status update (alt):', data);
+    socketInstance.on("equipment:status:update", (data) => {
       handleEquipmentUpdate(data.status || data);
     });
 
     setSocket(socketInstance);
 
     return () => {
-      console.log('🔌 [SLD] Cleaning up Socket.IO connection');
+      console.log("🔌 [SLD] Cleaning up Socket.IO connection");
       socketInstance.removeAllListeners();
       socketInstance.disconnect();
     };
   }, []);
 
-  // --- HANDLE LIVE EQUIPMENT UPDATES ---
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
-    
-    if (!equipmentId) {
-      console.warn('⚠️ [SLD] No equipmentId in update data', data);
-      return;
-    }
+    if (!equipmentId) return;
 
-    console.log('🔄 [SLD] Updating equipment:', equipmentId, 'Status:', data.status);
-
-    // Update live data state
     setLiveEquipmentData((prev) => ({
       ...prev,
       [equipmentId]: {
@@ -196,7 +177,6 @@ export default function SLDPage() {
     }));
   };
 
-  // --- Merge live data with equipment list ---
   const equipmentWithLiveData = useMemo(() => {
     if (!equipment || equipment.length === 0) return [];
 
@@ -204,7 +184,6 @@ export default function SLDPage() {
       const liveData = liveEquipmentData[eq.id];
       if (!liveData) return eq;
 
-      // Merge live data
       return {
         ...eq,
         status: {
@@ -212,7 +191,8 @@ export default function SLDPage() {
           status: liveData.status || eq.status?.status,
           temperature: liveData.temperature ?? eq.status?.temperature,
           vibration: liveData.vibration ?? eq.status?.vibration,
-          energyConsumption: liveData.energyConsumption ?? eq.status?.energyConsumption,
+          energyConsumption:
+            liveData.energyConsumption ?? eq.status?.energyConsumption,
           healthScore: liveData.healthScore ?? eq.status?.healthScore,
         },
       };
@@ -225,7 +205,6 @@ export default function SLDPage() {
       if (!labId || labId === "all") return;
       try {
         const equipmentData = await fetchEquipment({ labId, limit: 1000 });
-        
         const eqCount = equipmentData?.data?.length || 0;
         const defaultColumns =
           eqCount > 0 ? Math.max(1, Math.min(4, eqCount)) : 3;
@@ -301,7 +280,6 @@ export default function SLDPage() {
         await loadLabData(trainerLabId);
         setIsInitialized(true);
       } catch (error) {
-        console.error("Error initializing trainer data:", error);
         setIsInitialized(true);
         trainerInitializedRef.current = false;
       }
@@ -342,11 +320,11 @@ export default function SLDPage() {
     loadLabData(selectedLab);
   }, [selectedLab, user, loadLabData]);
 
-  const currentLabName = useMemo(() => {
-    if (user?.role === "TRAINER") return user.lab?.name || "Assigned Lab";
-    const labObj = labs.find((l) => l.labId === selectedLab);
-    return labObj ? labObj.name : "";
-  }, [user, labs, selectedLab]);
+  // Use ID instead of Name for Root Node display
+  const currentLabIdDisplay = useMemo(() => {
+    if (selectedLab === "all") return "";
+    return selectedLab; // This holds the ID (e.g., ITI_JAIPUR_FITTER_LAB_1)
+  }, [selectedLab]);
 
   const availableInstitutes = useMemo(() => {
     if (user?.role === "POLICY_MAKER") return institutes;
@@ -387,7 +365,6 @@ export default function SLDPage() {
     return filteredLabs;
   }, [labs, selectedInstitute, selectedDepartment, user]);
 
-  // --- Layout Actions ---
   const saveLayout = async () => {
     try {
       setIsSaving(true);
@@ -396,7 +373,6 @@ export default function SLDPage() {
         positions: equipmentPositions,
       });
       setHasUnsavedChanges(false);
-      console.log("Layout saved successfully!");
     } catch (error) {
       console.error("Failed to save layout:", error);
     } finally {
@@ -415,7 +391,6 @@ export default function SLDPage() {
   const toggleEditMode = async () => {
     if (isEditMode) {
       if (hasUnsavedChanges) {
-        console.log("Discarding changes, reloading layout...");
         await loadLabData(selectedLab);
         setHasUnsavedChanges(false);
       }
@@ -447,23 +422,7 @@ export default function SLDPage() {
     setEquipmentPositions(updatedPositions);
   };
 
-  const getEdgeColor = (rawStatus) => {
-    const status = rawStatus ? rawStatus.toUpperCase() : "IDLE";
-    if (status === "IN_CLASS") return "#3B82F6";
-    switch (status) {
-      case "OPERATIONAL":
-        return "#10B981";
-      case "IN_USE":
-        return "#3B82F6";
-      case "FAULTY": // NEW
-        return "#EF4444";
-      case "IDLE":
-      default:
-        return "#9CA3AF";
-    }
-  };
-
-  // --- REVISED LAYOUT GENERATION (Using equipmentWithLiveData) ---
+  // --- LAYOUT GENERATION ---
   const generateLayout = () => {
     if (selectedLab === "all" || equipmentWithLiveData.length === 0) {
       return { nodes: [], connections: [], totalWidth: 0, totalHeight: 0 };
@@ -479,12 +438,13 @@ export default function SLDPage() {
     });
 
     const maxRow = Math.max(...Object.values(positions).map((p) => p.row), 0);
-    const totalWidth = numColumns * COLUMN_WIDTH;
 
+    const totalWidth = numColumns * COLUMN_WIDTH;
     const rootX = (totalWidth - ROOT_WIDTH) / 2;
     const rootY = 0;
 
-    const equipmentStartY = rootY + ROOT_HEIGHT + 80;
+    // Gap from Root to First Equipment Row
+    const equipmentStartY = rootY + ROOT_HEIGHT + 150;
 
     const nodes = equipmentWithLiveData.map((eq) => {
       const pos = positions[eq.id] || { column: 0, row: 0 };
@@ -503,23 +463,20 @@ export default function SLDPage() {
     const connections = nodes.map((node) => {
       const startX = rootX + ROOT_WIDTH / 2;
       const startY = rootY + ROOT_HEIGHT;
-
       const busY = startY + BUS_OFFSET;
 
       const endX = node.x + NODE_WIDTH / 2;
       const endY = node.y;
 
-      const rawStatus = node.equipment.status?.status;
-      const isAnimated = rawStatus === "IN_USE" || rawStatus === "IN_CLASS";
-
+      // GRAY LINE
       return {
         startX,
         startY,
         busY,
         endX,
         endY,
-        color: getEdgeColor(rawStatus),
-        animated: isAnimated,
+        color: "#94a3b8", // Slate-400 Gray
+        animated: false,
       };
     });
 
@@ -593,7 +550,6 @@ export default function SLDPage() {
             <h1 className="text-2xl font-bold text-gray-900">
               Single Line Diagram (SLD)
             </h1>
-            {/* Connection Indicator */}
             {isSocketConnected ? (
               <span className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full border border-green-200">
                 <Wifi className="w-3 h-3" />
@@ -606,48 +562,42 @@ export default function SLDPage() {
               </span>
             )}
           </div>
-          {user?.role === "TRAINER" && (
-            <p className="text-gray-500 mt-1 flex items-center gap-2 animate-fadeIn">
-              <Microscope className="text-blue-500 w-5 h-5" />
-              Viewing:{" "}
-              <span className="font-semibold text-gray-700">
-                {currentLabName}
-              </span>
-            </p>
-          )}
+          {/* User role specific text removed as per request to simplify root node and view */}
         </div>
-        {canEdit && selectedLab !== "all" && equipmentWithLiveData.length > 0 && (
-          <div className="flex gap-2">
-            {isEditMode ? (
-              <>
-                <button
-                  onClick={saveLayout}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
-                  disabled={!hasUnsavedChanges || isSaving}
-                >
-                  <Save className="w-4 h-4" />
-                  {isSaving ? "Saving..." : "Save Layout"}
-                </button>
+        {canEdit &&
+          selectedLab !== "all" &&
+          equipmentWithLiveData.length > 0 && (
+            <div className="flex gap-2">
+              {isEditMode ? (
+                <>
+                  <button
+                    onClick={saveLayout}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
+                    disabled={!hasUnsavedChanges || isSaving}
+                  >
+                    <Save className="w-4 h-4" />
+                    {isSaving ? "Saving..." : "Save Layout"}
+                  </button>
+                  <button
+                    onClick={toggleEditMode}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
+                    disabled={isSaving}
+                  >
+                    <X className="w-4 h-4" />
+                    Exit Edit
+                  </button>
+                </>
+              ) : (
                 <button
                   onClick={toggleEditMode}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
-                  disabled={isSaving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                 >
-                  <X className="w-4 h-4" />
-                  Exit Edit
+                  <Edit className="w-4 h-4" />
+                  Edit Layout
                 </button>
-              </>
-            ) : (
-              <button
-                onClick={toggleEditMode}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-              >
-                <Edit className="w-4 h-4" />
-                Edit Layout
-              </button>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
       </div>
 
       {/* FILTER SECTION */}
@@ -743,23 +693,23 @@ export default function SLDPage() {
         </div>
       )}
 
-      {/* LEGEND - UPDATED WITH FAULTY */}
-      <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
-        <h3 className="font-semibold text-gray-900 mb-3">Status Legend</h3>
-        <div className="flex flex-wrap gap-4">
-          {Object.entries(STATUS_COLORS).map(([status, colorClass]) => (
-            <div key={status} className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${colorClass}`}></div>
-              <span className="text-sm text-gray-700">
-                {status.replace(/_/g, " ")}
+      {/* CANVAS / DIAGRAM AREA */}
+      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-sm border border-gray-200 p-8 overflow-auto flex justify-center relative">
+        {/* TOTAL EQUIPMENT COUNT - PINNED TO TOP RIGHT CORNER OF CANVAS */}
+        {selectedLab !== "all" && equipment.length > 0 && (
+          <div className="absolute top-4 right-4 z-30 pointer-events-none">
+            <div className="bg-white/90 backdrop-blur-sm border border-gray-300 px-4 py-2 rounded-lg shadow-md flex items-center gap-2 pointer-events-auto">
+              <LayoutGrid className="w-4 h-4 text-gray-500" />
+              <span className="text-sm font-semibold text-gray-700">
+                Total Equipment:{" "}
+                <span className="text-blue-600 text-base ml-1">
+                  {equipment.length}
+                </span>
               </span>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        )}
 
-      {/* CANVAS / DIAGRAM AREA */}
-      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-sm border border-gray-200 p-8 overflow-auto flex justify-center">
         {isLoading ? (
           <div className="flex justify-center items-center min-h-[600px] w-full">
             <LoadingSpinner size="lg" />
@@ -817,7 +767,7 @@ export default function SLDPage() {
               </svg>
             )}
 
-            {/* ROOT NODE - Z-Index 10 to sit above lines */}
+            {/* ROOT NODE - SIMPLIFIED TO LAB ID */}
             <div
               className="absolute z-10"
               style={{
@@ -826,23 +776,18 @@ export default function SLDPage() {
               }}
             >
               <div
-                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-4 flex flex-col justify-center"
+                className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg shadow-lg p-4 flex flex-col justify-center items-center"
                 style={{ width: `${ROOT_WIDTH}px`, height: `${ROOT_HEIGHT}px` }}
               >
-                <div className="text-center">
-                  <h3 className="font-bold text-lg leading-tight line-clamp-2 px-2">
-                    {currentLabName}
+                <div className="text-center w-full">
+                  <h3 className="font-bold text-sm leading-tight px-2 break-all uppercase tracking-wide">
+                    {currentLabIdDisplay}
                   </h3>
-                  <div className="mt-2 pt-2 border-t border-blue-400">
-                    <p className="text-sm font-semibold opacity-90">
-                      Total Equipment: {equipment.length}
-                    </p>
-                  </div>
                 </div>
               </div>
             </div>
 
-            {/* CONNECTION LINES - Z-Index 0 to sit behind cards */}
+            {/* CONNECTION LINES */}
             <svg
               className="absolute pointer-events-none z-0"
               style={{ width: "100%", height: "100%", top: 0, left: 0 }}
@@ -893,7 +838,7 @@ export default function SLDPage() {
               ))}
             </svg>
 
-            {/* EQUIPMENT NODES - Z-Index 10 */}
+            {/* EQUIPMENT NODES */}
             {layout.nodes.map((node) => (
               <EquipmentNode
                 key={node.equipment.id}
@@ -908,7 +853,8 @@ export default function SLDPage() {
           </div>
         )}
       </div>
-      {/* Equipment Details Modal - Render at root level */}
+
+      {/* Equipment Details Modal */}
       {selectedEquipmentForModal && (
         <EquipmentDetailsModal
           equipment={selectedEquipmentForModal}
@@ -919,58 +865,48 @@ export default function SLDPage() {
   );
 }
 
-const STATUS_CONFIG = {
-    OPERATIONAL: {
-      color: "bg-emerald-500",
-      textColor: "text-emerald-700",
-      icon: CheckCircle,
-      label: "Operational",
-    },
-    IN_USE: {
-      color: "bg-blue-500",
-      textColor: "text-blue-700",
-      icon: Activity,
-      label: "In Use",
-    },
-    IDLE: {
-      color: "bg-gray-400",
-      textColor: "text-gray-600",
-      icon: Clock,
-      label: "Idle",
-    },
-    FAULTY: {
-      color: "bg-red-500",
-      textColor: "text-red-700",
-      icon: AlertCircle,
-      label: "Faulty",
-    },
-  };
+// --- HELPER COMPONENTS ---
 
-  const getDisplayStatus = (backendStatus) => {
-    if (!backendStatus) return "IDLE";
-    const status = backendStatus.toUpperCase();
-    if (status === "FAULTY" || status === "MAINTENANCE") return "FAULTY";
-    if (status === "IN_USE" || status === "IN_CLASS") return "IN_USE";
-    if (status === "OPERATIONAL") return "OPERATIONAL";
-    return "IDLE";
-  };
+const STATUS_CONFIG_MODAL = {
+  ONLINE: {
+    color: "bg-emerald-500",
+    textColor: "text-emerald-700",
+    icon: Wifi,
+    label: "Online",
+  },
+  OFFLINE: {
+    color: "bg-red-500",
+    textColor: "text-red-700",
+    icon: WifiOff,
+    label: "Offline",
+  },
+};
 
-// Equipment Details Modal Component
+const getDisplayStatus_Modal = (backendStatus) => {
+  if (!backendStatus) return "OFFLINE";
+  const status = backendStatus.toUpperCase();
+  if (status === "OPERATIONAL" || status === "IN_USE" || status === "IN_CLASS")
+    return "ONLINE";
+  return "OFFLINE";
+};
+
+// Simplified Equipment Details Modal (Keep this as is for details)
 function EquipmentDetailsModal({ equipment, onClose }) {
   if (!equipment) return null;
 
-  const displayStatusKey = getDisplayStatus(equipment.status?.status);
-  const config = STATUS_CONFIG[displayStatusKey];
+  const displayStatusKey = getDisplayStatus_Modal(equipment.status?.status);
+  const config = STATUS_CONFIG_MODAL[displayStatusKey];
   const StatusIcon = config.icon;
-  const healthScore = equipment.status?.healthScore || 0;
-  const unresolvedAlerts = equipment._count?.alerts || 0;
 
-  const getHealthColor = (score) => {
-    if (score >= 80) return "text-emerald-600";
-    if (score >= 60) return "text-amber-600";
-    if (score >= 40) return "text-orange-600";
-    return "text-red-600";
-  };
+  const currentConsumption = equipment.status?.energyConsumption;
+  const lastRecordedConsumption = equipment.status?.lastEnergyConsumption;
+
+  const displayConsumption =
+    displayStatusKey === "ONLINE" && currentConsumption !== undefined
+      ? currentConsumption
+      : lastRecordedConsumption !== undefined
+      ? lastRecordedConsumption
+      : 0;
 
   return (
     <div
@@ -1011,18 +947,9 @@ function EquipmentDetailsModal({ equipment, onClose }) {
             </div>
           </div>
 
-          {equipment.serialNumber && (
-            <div className="text-sm">
-              <p className="text-gray-500 mb-1">Serial Number</p>
-              <p className="font-medium font-mono text-gray-900">
-                {equipment.serialNumber}
-              </p>
-            </div>
-          )}
-
           <div className="pt-4 border-t border-gray-200 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Status</span>
+              <span className="text-sm text-gray-600">Connectivity Status</span>
               <div className="flex items-center gap-2">
                 <StatusIcon className={`w-4 h-4 ${config.textColor}`} />
                 <span className={`text-sm font-semibold ${config.textColor}`}>
@@ -1032,20 +959,18 @@ function EquipmentDetailsModal({ equipment, onClose }) {
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Health Score</span>
-              <span className={`text-lg font-bold ${getHealthColor(healthScore)}`}>
-                {healthScore.toFixed(1)}%
-              </span>
-            </div>
-
-            {equipment.status?.temperature && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Temperature</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {equipment.status.temperature.toFixed(1)}°C
+              <span className="text-sm text-gray-600">Energy Consumption</span>
+              <div>
+                <span className="text-lg font-bold text-gray-900">
+                  {displayConsumption.toFixed(2)} kW
                 </span>
+                <p className="text-xs text-gray-500 mt-0.5 text-right">
+                  {displayStatusKey === "ONLINE"
+                    ? `(Live Usage)`
+                    : `(Last Recorded)`}
+                </p>
               </div>
-            )}
+            </div>
 
             {equipment.status?.isOperatingInClass && (
               <div className="flex items-center gap-2 bg-purple-50 p-3 rounded-lg text-sm">
@@ -1055,28 +980,14 @@ function EquipmentDetailsModal({ equipment, onClose }) {
                 </span>
               </div>
             )}
-
-            {unresolvedAlerts > 0 && (
-              <div className="flex items-center gap-2 bg-red-50 p-3 rounded-lg text-sm">
-                <AlertTriangle className="w-4 h-4 text-red-600" />
-                <span className="text-red-700 font-medium">
-                  {unresolvedAlerts} alert{unresolvedAlerts > 1 ? "s" : ""}
-                </span>
-              </div>
-            )}
           </div>
-
-          {equipment.status?.lastUsedAt && (
-            <div className="text-xs text-gray-500 pt-3 border-t border-gray-200">
-              Last used: {new Date(equipment.status.lastUsedAt).toLocaleString()}
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 }
 
+// Wrapper Component for Equipment Node Positioning & Edit Mode
 function EquipmentNode({
   node,
   isEditMode,
@@ -1117,6 +1028,7 @@ function EquipmentNode({
       }}
     >
       <div className="relative">
+        {/* Edit Mode Badge - Updated to fit new node width */}
         {isEditMode && (
           <div
             className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-2 py-1 rounded text-xs cursor-pointer hover:bg-blue-700 flex items-center gap-1 shadow-md z-[15]"
@@ -1127,7 +1039,7 @@ function EquipmentNode({
           </div>
         )}
 
-        <EquipmentNodeComponent 
+        <EquipmentNodeComponent
           data={{ equipment: node.equipment }}
           onOpenModal={onOpenModal}
         />

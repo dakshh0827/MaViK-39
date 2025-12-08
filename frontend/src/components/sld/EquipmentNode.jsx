@@ -2,157 +2,88 @@
  * =====================================================
  * frontend/src/components/sld/EquipmentNode.jsx
  * =====================================================
- * Updated to support 'FAULTY' status for Real-Time monitoring
- * Updated with Modal for equipment details
+ * Updated: Wider (210px), Rounded Corners (Pill), Offline Data Logic
  */
-import { useState, memo } from "react";
-import {
-  Activity,
-  CheckCircle,
-  Clock,
-  X,
-  AlertTriangle,
-  GraduationCap,
-  AlertCircle, // Added for FAULTY status
-} from "lucide-react";
+import { memo } from "react";
 
-// STRICT 4-STATE CONFIGURATION (Added FAULTY)
 const STATUS_CONFIG = {
-  OPERATIONAL: {
-    color: "bg-emerald-500",
-    dotColor: "bg-emerald-400",
-    textColor: "text-emerald-700",
-    borderColor: "border-emerald-200",
-    icon: CheckCircle,
-    label: "Operational",
+  ONLINE: {
+    dotColor: "bg-emerald-500",
+    energyColor: "text-emerald-600",
   },
-  IN_USE: {
-    color: "bg-blue-500",
-    dotColor: "bg-blue-400",
-    textColor: "text-blue-700",
-    borderColor: "border-blue-200",
-    icon: Activity,
-    label: "In Use",
-  },
-  IDLE: {
-    color: "bg-gray-400",
-    dotColor: "bg-gray-300",
-    textColor: "text-gray-600",
-    borderColor: "border-gray-200",
-    icon: Clock,
-    label: "Idle",
-  },
-  FAULTY: {
-    color: "bg-red-500",
-    dotColor: "bg-red-400",
-    textColor: "text-red-700",
-    borderColor: "border-red-200",
-    icon: AlertCircle,
-    label: "Faulty",
+  OFFLINE: {
+    dotColor: "bg-red-500",
+    energyColor: "text-red-600",
   },
 };
 
 const getDisplayStatus = (backendStatus) => {
-  if (!backendStatus) return "IDLE";
-
+  if (!backendStatus) return "OFFLINE";
   const status = backendStatus.toUpperCase();
-
-  if (status === "FAULTY" || status === "MAINTENANCE") {
-    return "FAULTY";
+  if (
+    status === "OPERATIONAL" ||
+    status === "IN_USE" ||
+    status === "IN_CLASS"
+  ) {
+    return "ONLINE";
   }
-
-  if (status === "IN_USE" || status === "IN_CLASS") {
-    return "IN_USE";
-  }
-
-  if (status === "OPERATIONAL") {
-    return "OPERATIONAL";
-  }
-
-  return "IDLE";
+  return "OFFLINE";
 };
 
 function EquipmentNodeComponent({ data, onOpenModal }) {
   const equipment = data.equipment;
-
-  // 1. Get Normalized Status Key
   const displayStatusKey = getDisplayStatus(equipment.status?.status);
-
-  // 2. Get Config
   const config = STATUS_CONFIG[displayStatusKey];
-  const StatusIcon = config.icon;
 
-  const healthScore = equipment.status?.healthScore || 0;
-  const unresolvedAlerts = equipment._count?.alerts || 0;
+  // --- ENERGY LOGIC FIX ---
+  const currentConsumption = equipment.status?.energyConsumption;
+  const lastRecordedConsumption = equipment.status?.lastEnergyConsumption;
 
-  const getHealthColor = (score) => {
-    if (score >= 80) return "text-emerald-600";
-    if (score >= 60) return "text-amber-600";
-    if (score >= 40) return "text-orange-600";
-    return "text-red-600";
-  };
+  let displayConsumption = 0;
+
+  if (displayStatusKey === "ONLINE") {
+    // If Online, use current real-time consumption
+    displayConsumption = currentConsumption ?? 0;
+  } else {
+    // If Offline (Faulty, Idle, etc.), STRICTLY use lastRecordedConsumption
+    // If lastRecorded is null/undefined, it defaults to 0 (meaning no history available)
+    displayConsumption = lastRecordedConsumption ?? 0;
+  }
 
   return (
-    <div
-      className="relative group"
-      onClick={() => onOpenModal(equipment)}
-    >
-      {/* MAIN CARD - same as before */}
+    <div className="relative group" onClick={() => onOpenModal(equipment)}>
+      {/* RECTANGLE CARD 
+          Width: 210px (Increased to fit long IDs)
+          Height: 46px (Comfortable height)
+          Rounded: rounded-full (Pill shape for softer look)
+      */}
       <div
         className={`
-          relative w-[140px] bg-white rounded-lg border-2 ${config.borderColor}
-          shadow-sm group-hover:shadow-md transition-all duration-200 cursor-pointer
-          overflow-hidden
+          relative w-[210px] h-[46px] bg-white rounded-2xl border border-gray-400 
+          shadow-sm hover:shadow-md hover:border-blue-500 transition-all duration-200 cursor-pointer
+          flex items-center justify-between px-5
         `}
       >
-        {/* Status Bar */}
-        <div className={`h-1 ${config.color}`}></div>
+        {/* LEFT: Status Dot + ID */}
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div
+            className={`w-3 h-3 rounded-full ${config.dotColor} flex-shrink-0 shadow-sm`}
+          ></div>
+          {/* ID with flex-shrink to ensure it truncates if absolutely necessary, 
+              but width is increased to avoid this. */}
+          <span className="text-md font-mono font-bold text-gray-700 truncate tracking-tight">
+            {equipment.equipmentId}
+          </span>
+        </div>
 
-        {/* Content */}
-        <div className="p-3 space-y-2">
-          {/* Equipment Name */}
-          <div>
-            <h3 className="font-semibold text-gray-900 text-xs leading-tight line-clamp-2">
-              {equipment.name}
-            </h3>
-            <p className="text-[10px] text-gray-500 font-mono mt-0.5 truncate">
-              {equipment.equipmentId}
-            </p>
-          </div>
-
-          {/* Metrics */}
-          <div className="space-y-1.5">
-            {/* Status */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <div
-                  className={`w-2 h-2 rounded-full ${config.dotColor}`}
-                ></div>
-                <span className="text-[10px] text-gray-600">
-                  {config.label}
-                </span>
-              </div>
-            </div>
-
-            {/* Health Score */}
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-gray-600">Health</span>
-              <span
-                className={`text-xs font-bold ${getHealthColor(healthScore)}`}
-              >
-                {healthScore.toFixed(0)}%
-              </span>
-            </div>
-          </div>
+        {/* RIGHT: Energy Consumption */}
+        <div className="flex-shrink-0 pl-2">
+          <span className={`text-md font-bold ${config.energyColor}`}>
+            {displayConsumption.toFixed(1)}{" "}
+            <span className="text-md font-medium text-gray-400">kW</span>
+          </span>
         </div>
       </div>
-
-      {/* Alert Badge */}
-      {unresolvedAlerts > 0 && (
-        <div className="absolute -top-2 -right-2 z-10 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-sm ring-2 ring-white">
-          {unresolvedAlerts}
-        </div>
-      )}
     </div>
   );
 }
