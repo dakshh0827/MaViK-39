@@ -85,7 +85,7 @@ model Student {
   lab         Lab        @relation(fields: [labId], references: [id])
 
   // Enrollment Details
-  enrollmentNumber String     @unique
+  enrollmentNumber String  @unique
   enrollmentDate   DateTime   @default(now())
   courseType       CourseType
   batchYear        String
@@ -99,8 +99,7 @@ model Student {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([aadhaarNumber])
-  @@index([enrollmentNumber])
+  // ✅ FIX: Removed redundant @@index for aadhaarNumber and enrollmentNumber
   @@index([instituteId])
   @@index([labId])
   @@map("students")

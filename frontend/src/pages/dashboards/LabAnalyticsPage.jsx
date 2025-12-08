@@ -28,10 +28,12 @@ import {
   TrendingUp,
   TrendingDown,
   Activity,
-  Clock,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import api from "../../lib/axios";
+import BiometricAuthModal from "../../components/biometric/BiometricAuthModal";
 
 // --- CONSTANTS ---
 const STATUS_COLORS = {
@@ -156,7 +158,7 @@ export default function LabAnalyticsPage() {
   const [liveUpdates, setLiveUpdates] = useState({});
   const [isSocketConnected, setIsSocketConnected] = useState(false);
 
-  const [authenticatedEquipment, setAuthenticatedEquipment] = useState({});
+  // --- AUTHENTICATION STATE ---
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [selectedEquipmentForAuth, setSelectedEquipmentForAuth] = useState(null);
 
@@ -224,13 +226,12 @@ export default function LabAnalyticsPage() {
   }, []);
 
   // ========================================
-  // 🆕 HANDLE LIVE UPDATES (Temp + Vib)
+  // 🆕 HANDLE LIVE UPDATES (Status + Auth)
   // ========================================
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
 
     if (!equipmentId) {
-      console.warn("⚠️ No equipmentId in update data", data);
       return;
     }
 
@@ -239,11 +240,15 @@ export default function LabAnalyticsPage() {
       ...prev,
       [equipmentId]: {
         temperature: data.temperature,
-        vibration: data.vibration, // CAPTURE VIBRATION
+        vibration: data.vibration, 
         healthScore: data.healthScore,
         efficiency: data.efficiency,
         status: data.status,
         energyConsumption: data.energyConsumption,
+        // Authentication Updates
+        isLocked: data.isLocked, 
+        currentUserId: data.currentUserId,
+        
         timestamp: data.readingTimestamp || new Date().toISOString(), 
         updatedAt: new Date(), 
       },
@@ -257,6 +262,10 @@ export default function LabAnalyticsPage() {
         if (eq.id === equipmentId) {
           return {
             ...eq,
+            // Merge Auth State
+            isLocked: data.isLocked !== undefined ? data.isLocked : eq.isLocked,
+            currentUserId: data.currentUserId !== undefined ? data.currentUserId : eq.currentUserId,
+            
             status: {
               ...eq.status,
               status: data.status || eq.status?.status,
@@ -266,7 +275,7 @@ export default function LabAnalyticsPage() {
             analyticsParams: {
               ...eq.analyticsParams,
               temperature: data.temperature ?? eq.analyticsParams?.temperature,
-              vibration: data.vibration ?? eq.analyticsParams?.vibration, // UPDATE VIBRATION
+              vibration: data.vibration ?? eq.analyticsParams?.vibration, 
               efficiency: data.efficiency ?? eq.analyticsParams?.efficiency,
               energyConsumption: data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
             },
@@ -327,6 +336,23 @@ export default function LabAnalyticsPage() {
       fetchData();
     }
   }, [labId]);
+
+  // --- AUTH HANDLERS ---
+  const handleAuthClick = (equipment) => {
+    if (!equipment.isLocked) return; // Prevent clicking if already unlocked
+    setSelectedEquipmentForAuth(equipment);
+    setShowAuthModal(true);
+  };
+
+  const handleAuthSuccess = (data) => {
+    // The socket should handle the state update, but we can do a quick optimistic update or refresh
+    console.log("Authentication Successful:", data);
+    
+    // Optional: Refresh full data to ensure cascading unlocks are reflected if socket is slow
+    api.get(`/monitoring/lab-analytics/${labId}`)
+       .then(res => setLabData(res.data.data))
+       .catch(console.error);
+  };
 
   // --- CHART DATA PREPARATION ---
   const chartData = useMemo(() => {
@@ -407,7 +433,7 @@ export default function LabAnalyticsPage() {
       vibrationData,
       energyData,
     };
-  }, [labData, liveUpdates]); // liveUpdates dependency ensures charts re-render
+  }, [labData, liveUpdates]); 
 
   // --- CALCULATE AVERAGE AI CONFIDENCE ---
   const avgAiConfidence = useMemo(() => {
@@ -428,6 +454,15 @@ export default function LabAnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gray-200 flex flex-col">
+      {/* --- AUTH MODAL --- */}
+      <BiometricAuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        equipmentId={selectedEquipmentForAuth?.id}
+        equipmentName={selectedEquipmentForAuth?.name}
+        onAuthSuccess={handleAuthSuccess}
+      />
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-5 sticky top-0 z-10 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -582,11 +617,15 @@ export default function LabAnalyticsPage() {
           </div>
         )}
 
-        {/* Live Equipment Table */}
+        {/* Live Equipment Table with AUTH Controls */}
         {labData.equipment && labData.equipment.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">Equipment Detail View (Real-time Metrics)</h3>
+              <div className="flex flex-col">
+                <h3 className="font-bold text-gray-900">Equipment Access & Metrics</h3>
+                <span className="text-xs text-gray-500">Click on 'Locked' button to authenticate via Biometrics</span>
+              </div>
+              
               {Object.keys(liveUpdates).length > 0 && (
                 <span className="text-xs text-green-600 flex items-center gap-1 font-bold animate-pulse">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -599,9 +638,9 @@ export default function LabAnalyticsPage() {
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Equipment</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Access Control</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Health</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Efficiency</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Temp</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Vib</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Energy</th>
@@ -614,6 +653,9 @@ export default function LabAnalyticsPage() {
                     const isFresh = live && (new Date() - live.updatedAt < 5000);
                     const displayTime = live?.timestamp || eq.status?.lastUsedAt;
 
+                    // Determine Lock State (Live update takes precedence, fallback to initial fetch)
+                    const isLocked = live?.isLocked !== undefined ? live.isLocked : eq.isLocked;
+
                     return (
                       <tr key={eq.id} className={`hover:bg-gray-50 transition-colors duration-500 ${isFresh ? "bg-green-50" : ""}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -624,6 +666,26 @@ export default function LabAnalyticsPage() {
                             )}
                           </div>
                         </td>
+
+                        {/* AUTHENTICATION / LOCK COLUMN */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {isLocked ? (
+                            <button
+                                onClick={() => handleAuthClick(eq)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors border border-red-200 shadow-sm"
+                                title="Click to Authenticate"
+                            >
+                                <Lock className="w-3.5 h-3.5" />
+                                LOCKED
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold border border-green-200">
+                                <Unlock className="w-3.5 h-3.5" />
+                                UNLOCKED
+                            </div>
+                          )}
+                        </td>
+
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                              className={`px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full text-white`}
@@ -637,20 +699,13 @@ export default function LabAnalyticsPage() {
                                 {(live?.healthScore ?? eq.status?.healthScore ?? 0).toFixed(0)}%
                             </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                           <span className={isFresh ? "font-bold text-green-700" : ""}>
-                                {(live?.efficiency ?? eq.analyticsParams?.efficiency ?? 0).toFixed(0)}%
-                            </span>
-                        </td>
                         
-                        {/* TEMPERATURE CELL */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           <span className={isFresh ? "font-bold text-green-700" : ""}>
                             {(live?.temperature ?? eq.analyticsParams?.temperature)?.toFixed(1) ?? "N/A"}°C
                           </span>
                         </td>
 
-                        {/* VIBRATION CELL - UPDATED */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                            <span className={isFresh ? "font-bold text-green-700" : ""}>
                             {(live?.vibration ?? eq.analyticsParams?.vibration)?.toFixed(2) ?? "-"}
