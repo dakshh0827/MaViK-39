@@ -156,6 +156,10 @@ export default function LabAnalyticsPage() {
   const [liveUpdates, setLiveUpdates] = useState({});
   const [isSocketConnected, setIsSocketConnected] = useState(false);
 
+  const [authenticatedEquipment, setAuthenticatedEquipment] = useState({});
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [selectedEquipmentForAuth, setSelectedEquipmentForAuth] = useState(null);
+
   // --- SOCKET.IO CONNECTION ---
   useEffect(() => {
     console.log("🔌 Setting up Socket.IO connection...");

@@ -18,6 +18,8 @@ import reportRoutes from "./report.routes.js";
 import chatbotRoutes from "./chatbot.routes.js";
 import breakdownRoutes from "./breakdown.routes.js";
 import sldRoutes from "./sld.routes.js";
+import equipmentAuthRoutes from "./equipmentAuth.routes.js";
+import studentRoutes from "./student.routes.js";
 
 const router = express.Router();
 
@@ -40,6 +42,8 @@ router.get("/", (req, res) => {
       maintenance: "/api/maintenance",
       reports: "/api/reports",
       chatbot: "/api/chatbot",
+      equipmentAuth: "/api/equipment-auth",
+      student: "/api/students",
     },
   });
 });
@@ -59,5 +63,7 @@ router.use("/reports", reportRoutes);
 router.use("/chatbot", chatbotRoutes);
 router.use("/breakdown", breakdownRoutes);
 router.use("/sld-layouts", sldRoutes);
+router.use("/equipment-auth", equipmentAuthRoutes);
+router.use("/students", studentRoutes);
 
 export default router;
