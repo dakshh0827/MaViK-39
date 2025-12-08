@@ -18,8 +18,8 @@ except FileNotFoundError:
     model = None
 
 # Feature validation
-FEATURES = ['Temperature_C', 'Vibration_mms', 'Energy_Consumption_W', 
-            'Days_Since_Weekly_Maintenance']
+FEATURES = ['Machine_ID','Hourly_Usage','Temperature_C', 'Vibration_mms', 'Energy_Consumption_W', 
+            'Days_Since_Weekly_Maintenance','Maintenance_Type']
 
 FEATURE_RANGES = {
     'Temperature_C': (50, 100),
@@ -47,19 +47,25 @@ def predict():
         
         # Extract features
         features_dict = {
+            'Machine_ID': data.get('Machine_ID'),
+            'Hourly_Usage': data.get('Hourly_Usage'),
             'Temperature_C': data.get('Temperature_C'),
             'Vibration_mms': data.get('Vibration_mms'),
             'Energy_Consumption_W': data.get('Energy_Consumption_W'),
-            'Days_Since_Weekly_Maintenance': data.get('Days_Since_Weekly_Maintenance')
+            'Days_Since_Weekly_Maintenance': data.get('Days_Since_Weekly_Maintenance'),
+            'Maintenance_Type': data.get('Maintenance_Type')
         }
         
         
         # Create feature array
         X = np.array([[
+            features_dict['Machine_ID'],
+            features_dict['Hourly_Usage'],
             features_dict['Temperature_C'],
             features_dict['Vibration_mms'],
             features_dict['Energy_Consumption_W'],
-            features_dict['Days_Since_Weekly_Maintenance']
+            features_dict['Days_Since_Weekly_Maintenance'],
+            features_dict['Maintenance_Type']
         ]])
         
         # Make prediction
