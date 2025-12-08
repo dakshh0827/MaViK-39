@@ -2,7 +2,7 @@
  * =====================================================
  * frontend/src/pages/SLDPage.jsx
  * =====================================================
- * Updated: Root Node shows Lab ID, Count pinned to canvas corner
+ * Updated: Real-time Connection Status (ON/OFF) based on 30s timeout
  */
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useAuthStore } from "../stores/authStore";
@@ -23,7 +23,6 @@ import {
   Minus,
   GripVertical,
   Columns,
-  Microscope,
   Wifi,
   WifiOff,
   GraduationCap,
@@ -48,7 +47,7 @@ const NODE_HEIGHT = 46;
 const COLUMN_WIDTH = 260;
 const ROW_HEIGHT = 100;
 const ROOT_WIDTH = 280;
-const ROOT_HEIGHT = 80; // Reduced height slightly as text is smaller/cleaner
+const ROOT_HEIGHT = 80;
 const CANVAS_PADDING = 50;
 const BUS_OFFSET = 60;
 
@@ -98,6 +97,9 @@ export default function SLDPage() {
   const [socket, setSocket] = useState(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [liveEquipmentData, setLiveEquipmentData] = useState({});
+  
+  // Time state for "Alive" check
+  const [currentTime, setCurrentTime] = useState(Date.now());
 
   const trainerInitializedRef = useRef(false);
 
@@ -164,6 +166,15 @@ export default function SLDPage() {
     };
   }, []);
 
+  // --- ALIVE CHECK INTERVAL ---
+  // Update currentTime every 2 seconds to trigger re-renders for timeout logic
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
     if (!equipmentId) return;
@@ -172,7 +183,7 @@ export default function SLDPage() {
       ...prev,
       [equipmentId]: {
         ...data,
-        updatedAt: new Date(),
+        updatedAt: new Date(), // Important for timeout check
       },
     }));
   };
@@ -182,10 +193,21 @@ export default function SLDPage() {
 
     return equipment.map((eq) => {
       const liveData = liveEquipmentData[eq.id];
-      if (!liveData) return eq;
+      
+      // Determine Alive Status
+      let isAlive = false;
+      if (liveData && liveData.updatedAt) {
+        const lastUpdate = new Date(liveData.updatedAt).getTime();
+        if (currentTime - lastUpdate < 30000) { // 30 Seconds Threshold
+             isAlive = true;
+        }
+      }
+
+      if (!liveData) return { ...eq, isAlive: false };
 
       return {
         ...eq,
+        isAlive,
         status: {
           ...eq.status,
           status: liveData.status || eq.status?.status,
@@ -197,7 +219,7 @@ export default function SLDPage() {
         },
       };
     });
-  }, [equipment, liveEquipmentData]);
+  }, [equipment, liveEquipmentData, currentTime]);
 
   // --- DATA LOADING LOGIC ---
   const loadLabData = useCallback(
@@ -320,10 +342,9 @@ export default function SLDPage() {
     loadLabData(selectedLab);
   }, [selectedLab, user, loadLabData]);
 
-  // Use ID instead of Name for Root Node display
   const currentLabIdDisplay = useMemo(() => {
     if (selectedLab === "all") return "";
-    return selectedLab; // This holds the ID (e.g., ITI_JAIPUR_FITTER_LAB_1)
+    return selectedLab;
   }, [selectedLab]);
 
   const availableInstitutes = useMemo(() => {
@@ -443,7 +464,6 @@ export default function SLDPage() {
     const rootX = (totalWidth - ROOT_WIDTH) / 2;
     const rootY = 0;
 
-    // Gap from Root to First Equipment Row
     const equipmentStartY = rootY + ROOT_HEIGHT + 150;
 
     const nodes = equipmentWithLiveData.map((eq) => {
@@ -468,15 +488,18 @@ export default function SLDPage() {
       const endX = node.x + NODE_WIDTH / 2;
       const endY = node.y;
 
-      // GRAY LINE
+      // Determine Connection Color based on "Alive" status
+      const isActive = node.equipment.isAlive;
+      const color = isActive ? "#22c55e" : "#94a3b8"; // Green if alive, Gray if offline
+
       return {
         startX,
         startY,
         busY,
         endX,
         endY,
-        color: "#94a3b8", // Slate-400 Gray
-        animated: false,
+        color,
+        animated: isActive, // Animate only if active
       };
     });
 
@@ -562,7 +585,6 @@ export default function SLDPage() {
               </span>
             )}
           </div>
-          {/* User role specific text removed as per request to simplify root node and view */}
         </div>
         {canEdit &&
           selectedLab !== "all" &&
@@ -695,7 +717,7 @@ export default function SLDPage() {
 
       {/* CANVAS / DIAGRAM AREA */}
       <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-sm border border-gray-200 p-8 overflow-auto flex justify-center relative">
-        {/* TOTAL EQUIPMENT COUNT - PINNED TO TOP RIGHT CORNER OF CANVAS */}
+        {/* TOTAL EQUIPMENT COUNT */}
         {selectedLab !== "all" && equipment.length > 0 && (
           <div className="absolute top-4 right-4 z-30 pointer-events-none">
             <div className="bg-white/90 backdrop-blur-sm border border-gray-300 px-4 py-2 rounded-lg shadow-md flex items-center gap-2 pointer-events-auto">
@@ -767,7 +789,7 @@ export default function SLDPage() {
               </svg>
             )}
 
-            {/* ROOT NODE - SIMPLIFIED TO LAB ID */}
+            {/* ROOT NODE */}
             <div
               className="absolute z-10"
               style={{
@@ -890,7 +912,7 @@ const getDisplayStatus_Modal = (backendStatus) => {
   return "OFFLINE";
 };
 
-// Simplified Equipment Details Modal (Keep this as is for details)
+// Simplified Equipment Details Modal
 function EquipmentDetailsModal({ equipment, onClose }) {
   if (!equipment) return null;
 
@@ -1028,7 +1050,7 @@ function EquipmentNode({
       }}
     >
       <div className="relative">
-        {/* Edit Mode Badge - Updated to fit new node width */}
+        {/* Edit Mode Badge */}
         {isEditMode && (
           <div
             className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-2 py-1 rounded text-xs cursor-pointer hover:bg-blue-700 flex items-center gap-1 shadow-md z-[15]"

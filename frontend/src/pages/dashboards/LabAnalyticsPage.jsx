@@ -1,10 +1,8 @@
-// frontend/src/pages/dashboards/LabAnalyticsPage.jsx - UPDATED STAT CARDS
+// frontend/src/pages/dashboards/LabAnalyticsPage.jsx
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   PieChart,
@@ -20,7 +18,6 @@ import {
 import {
   ArrowLeft,
   Box,
-  Clock,
   BarChart3,
   PieChart as PieChartIcon,
   Wrench,
@@ -31,9 +28,7 @@ import {
   TrendingUp,
   TrendingDown,
   Activity,
-  Wifi,
-  WifiOff,
-  Sparkles,
+  Clock,
 } from "lucide-react";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import api from "../../lib/axios";
@@ -58,6 +53,23 @@ const FALLBACK_COLORS = [
   "#84CC16",
   "#06B6D4",
 ];
+
+// --- HELPER: Date + Time ---
+const formatTimestamp = (isoString) => {
+  if (!isoString) return "N/A";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "Invalid Date";
+  
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+};
 
 const getISOStandard = (department) => {
   if (!department) return null;
@@ -95,7 +107,6 @@ const PredictiveMaintenanceCard = ({ equipment, prediction }) => {
   }
 
   return (
-    // Tall card layout for Predictive Maintenance
     <div
       className={`p-5 rounded-xl border ${priorityBg} shadow-sm min-h-[160px] flex flex-col justify-between`}
     >
@@ -209,7 +220,7 @@ export default function LabAnalyticsPage() {
   }, []);
 
   // ========================================
-  // 🆕 HANDLE LIVE UPDATES WITH REAL-TIME HEALTH/EFFICIENCY
+  // 🆕 HANDLE LIVE UPDATES (Temp + Vib)
   // ========================================
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
@@ -219,69 +230,48 @@ export default function LabAnalyticsPage() {
       return;
     }
 
-    console.log("📊 Real-time update received:", {
-      equipmentId,
-      temperature: data.temperature,
-      vibration: data.vibration,
-      energyConsumption: data.energyConsumption,
-      healthScore: data.healthScore,
-      efficiency: data.efficiency,
-    });
-
     // 1. Update Live Indicator State
     setLiveUpdates((prev) => ({
       ...prev,
       [equipmentId]: {
         temperature: data.temperature,
-        vibration: data.vibration,
-        energyConsumption: data.energyConsumption,
+        vibration: data.vibration, // CAPTURE VIBRATION
         healthScore: data.healthScore,
         efficiency: data.efficiency,
-        updatedAt: new Date(),
+        status: data.status,
+        energyConsumption: data.energyConsumption,
+        timestamp: data.readingTimestamp || new Date().toISOString(), 
+        updatedAt: new Date(), 
       },
     }));
 
-    // ========================================
-    // 🆕 UPDATE LAB DATA WITH REAL-TIME CALCULATED METRICS
-    // ========================================
+    // 2. Update Main Lab Data
     setLabData((prevLabData) => {
       if (!prevLabData || !prevLabData.equipment) return prevLabData;
 
       let updatedEquipmentList = prevLabData.equipment.map((eq) => {
         if (eq.id === equipmentId) {
-          // Use the calculated metrics from the backend
-          const newHealthScore =
-            data.healthScore ?? eq.status?.healthScore ?? 0;
-          const newEfficiency =
-            data.efficiency ?? eq.analyticsParams?.efficiency ?? 0;
-
           return {
             ...eq,
             status: {
               ...eq.status,
               status: data.status || eq.status?.status,
-              healthScore: newHealthScore,
-              temperature: data.temperature ?? eq.status?.temperature,
-              vibration: data.vibration ?? eq.status?.vibration,
-              energyConsumption:
-                data.energyConsumption ?? eq.status?.energyConsumption,
+              healthScore: data.healthScore ?? eq.status?.healthScore,
+              lastUsedAt: data.readingTimestamp || new Date().toISOString()
             },
             analyticsParams: {
               ...eq.analyticsParams,
               temperature: data.temperature ?? eq.analyticsParams?.temperature,
-              vibration: data.vibration ?? eq.analyticsParams?.vibration,
-              energyConsumption:
-                data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
-              efficiency: newEfficiency,
+              vibration: data.vibration ?? eq.analyticsParams?.vibration, // UPDATE VIBRATION
+              efficiency: data.efficiency ?? eq.analyticsParams?.efficiency,
+              energyConsumption: data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
             },
           };
         }
         return eq;
       });
 
-      // ========================================
-      // 🆕 RECALCULATE GLOBAL STATS BASED ON REAL-TIME DATA
-      // ========================================
+      // Recalculate Stats
       const totalEquipment = updatedEquipmentList.length;
       const avgHealthScore =
         updatedEquipmentList.reduce(
@@ -334,37 +324,31 @@ export default function LabAnalyticsPage() {
     }
   }, [labId]);
 
-  // --- LIVE INDICATOR COMPONENT ---
-  const LiveIndicator = ({ equipmentId }) => {
-    const update = liveUpdates[equipmentId];
-    if (!update) return null;
-
-    const secondsAgo = Math.floor((new Date() - update.updatedAt) / 1000);
-    const isLive = secondsAgo < 10;
-
-    return (
-      <div className="flex items-center gap-2 ml-2">
-        <span
-          className={`w-2 h-2 rounded-full ${
-            isLive ? "bg-green-50 animate-pulse" : "bg-gray-400"
-          }`}
-        />
-        <span
-          className={`text-[10px] font-bold ${
-            isLive ? "text-green-600" : "text-gray-500"
-          }`}
-        >
-          {isLive ? "LIVE" : `${secondsAgo}s ago`}
-        </span>
-      </div>
-    );
-  };
-
   // --- CHART DATA PREPARATION ---
   const chartData = useMemo(() => {
     if (!labData || !labData.equipment) return null;
 
-    const equipment = labData.equipment;
+    // 1. Merge liveUpdates into the equipment list
+    const equipment = labData.equipment.map(eq => {
+      const live = liveUpdates[eq.id];
+      if (!live) return eq;
+
+      return {
+        ...eq,
+        status: {
+          ...eq.status,
+          status: live.status || eq.status?.status,
+          healthScore: live.healthScore ?? eq.status?.healthScore,
+        },
+        analyticsParams: {
+          ...eq.analyticsParams,
+          temperature: live.temperature ?? eq.analyticsParams?.temperature,
+          vibration: live.vibration ?? eq.analyticsParams?.vibration,
+          efficiency: live.efficiency ?? eq.analyticsParams?.efficiency,
+          energyConsumption: live.energyConsumption ?? eq.analyticsParams?.energyConsumption,
+        }
+      };
+    });
 
     const statusData = equipment.reduce((acc, eq) => {
       let status = eq.status?.status || "OFFLINE";
@@ -381,12 +365,11 @@ export default function LabAnalyticsPage() {
       })
     );
 
-    // 🆕 Health Score uses real-time calculated values
     const healthScoreData = equipment.map((eq) => ({
       name: eq.name,
       shortName: eq.name.substring(0, 15) + (eq.name.length > 15 ? "..." : ""),
-      healthScore: eq.status?.healthScore || 0, // Real-time value
-      efficiency: eq.analyticsParams?.efficiency || 0, // Real-time value
+      healthScore: eq.status?.healthScore || 0,
+      efficiency: eq.analyticsParams?.efficiency || 0,
     }));
 
     const tempData = equipment
@@ -398,7 +381,7 @@ export default function LabAnalyticsPage() {
       }));
 
     const vibrationData = equipment
-      .filter((eq) => eq.analyticsParams?.vibration !== undefined)
+      .filter((eq) => eq.analyticsParams?.vibration != null)
       .map((eq) => ({
         name: eq.name,
         shortName: eq.name.substring(0, 10),
@@ -406,7 +389,7 @@ export default function LabAnalyticsPage() {
       }));
 
     const energyData = equipment
-      .filter((eq) => eq.analyticsParams?.energyConsumption !== undefined)
+      .filter((eq) => eq.analyticsParams?.energyConsumption != null)
       .map((eq) => ({
         name: eq.name,
         shortName: eq.name.substring(0, 10),
@@ -420,7 +403,7 @@ export default function LabAnalyticsPage() {
       vibrationData,
       energyData,
     };
-  }, [labData]);
+  }, [labData, liveUpdates]); // liveUpdates dependency ensures charts re-render
 
   // --- CALCULATE AVERAGE AI CONFIDENCE ---
   const avgAiConfidence = useMemo(() => {
@@ -432,39 +415,9 @@ export default function LabAnalyticsPage() {
     return (totalConfidence / predictiveData.length).toFixed(1);
   }, [predictiveData]);
 
-  // --- RENDER ---
-  if (isLoading)
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-
-  if (error)
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-200">
-        <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Error Loading Analytics
-          </h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Return to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-
-  if (!labData)
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <p className="text-gray-600">No data available.</p>
-      </div>
-    );
+  if (isLoading) return <div className="flex items-center justify-center min-h-screen bg-gray-50"><LoadingSpinner size="lg" /></div>;
+  if (error) return <div className="flex items-center justify-center min-h-screen bg-gray-200"><p className="text-red-500">{error}</p></div>;
+  if (!labData) return <div className="flex items-center justify-center min-h-screen bg-gray-50"><p className="text-gray-600">No data available.</p></div>;
 
   const isoStandard = getISOStandard(labData.lab?.department);
   const stats = labData.statistics || {};
@@ -475,10 +428,7 @@ export default function LabAnalyticsPage() {
       <div className="bg-white border-b border-gray-200 px-6 py-5 sticky top-0 z-10 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-900"
-            >
+            <button onClick={() => navigate("/dashboard")} className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-900">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
@@ -516,35 +466,13 @@ export default function LabAnalyticsPage() {
       </div>
 
       <div className="flex-1 w-full p-6 space-y-6">
-        {/* Stats Cards - UPDATED with Avg AI Confidence */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <StatCard
-            icon={Box}
-            title="Total Equipment"
-            value={stats.totalEquipment || 0}
-          />
-          <StatCard
-            icon={ShieldCheck}
-            title="Avg Health"
-            value={`${(stats.avgHealthScore || 0).toFixed(0)}%`}
-            color="text-green-600"
-          />
-          <StatCard
-            icon={TrendingUp}
-            title="Total Uptime"
-            value={`${(stats.totalUptime || 0).toFixed(0)}h`}
-          />
-          <StatCard
-            icon={TrendingDown}
-            title="Downtime"
-            value={`${(stats.totalDowntime || 0).toFixed(0)}h`}
-          />
-          <StatCard
-            icon={Activity}
-            title="Avg AI Confidence"
-            value={`${avgAiConfidence}%`}
-            color="text-purple-600"
-          />
+          <StatCard icon={Box} title="Total Equipment" value={stats.totalEquipment || 0} />
+          <StatCard icon={ShieldCheck} title="Avg Health" value={`${(stats.avgHealthScore || 0).toFixed(0)}%`} color="text-green-600" />
+          <StatCard icon={TrendingUp} title="Total Uptime" value={`${(stats.totalUptime || 0).toFixed(0)}h`} />
+          <StatCard icon={TrendingDown} title="Downtime" value={`${(stats.totalDowntime || 0).toFixed(0)}h`} />
+          <StatCard icon={Activity} title="Avg AI Confidence" value={`${avgAiConfidence}%`} color="text-purple-600" />
         </div>
 
         {/* Predictive Maintenance */}
@@ -570,9 +498,7 @@ export default function LabAnalyticsPage() {
                 {predictiveData.map((item) => (
                   <PredictiveMaintenanceCard
                     key={item.id}
-                    equipment={labData.equipment?.find(
-                      (eq) => eq.id === item.id
-                    )}
+                    equipment={labData.equipment?.find((eq) => eq.id === item.id)}
                     prediction={item.prediction}
                   />
                 ))}
@@ -605,13 +531,7 @@ export default function LabAnalyticsPage() {
                       }
                     >
                       {chartData.statusChartData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={
-                            STATUS_COLORS[entry.rawStatus] ||
-                            FALLBACK_COLORS[index]
-                          }
-                        />
+                        <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.rawStatus] || FALLBACK_COLORS[index]} />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -624,64 +544,20 @@ export default function LabAnalyticsPage() {
             {/* Health Chart */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2 flex flex-col">
               <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <BarChart3 className="text-green-500 w-5 h-5" /> Health &
-                Efficiency (Real-time)
+                <BarChart3 className="text-green-500 w-5 h-5" /> Health & Efficiency (Real-time)
               </h3>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={chartData.healthScoreData}
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    barCategoryGap={
-                      chartData.healthScoreData.length > 15
-                        ? "5%"
-                        : chartData.healthScoreData.length > 10
-                        ? "10%"
-                        : "15%"
-                    }
                   >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="#f0f0f0"
-                    />
-                    <XAxis
-                      dataKey="shortName"
-                      angle={chartData.healthScoreData.length > 10 ? -45 : -20}
-                      textAnchor="end"
-                      height={60}
-                      tick={{
-                        fontSize:
-                          chartData.healthScoreData.length > 15 ? 9 : 11,
-                      }}
-                      interval={0}
-                    />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis dataKey="shortName" angle={-20} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar
-                      dataKey="healthScore"
-                      fill="#10B981"
-                      name="Health Score"
-                      maxBarSize={
-                        chartData.healthScoreData.length > 15
-                          ? 20
-                          : chartData.healthScoreData.length > 10
-                          ? 30
-                          : 50
-                      }
-                    />
-                    <Bar
-                      dataKey="efficiency"
-                      fill="#3B82F6"
-                      name="Efficiency %"
-                      maxBarSize={
-                        chartData.healthScoreData.length > 15
-                          ? 20
-                          : chartData.healthScoreData.length > 10
-                          ? 30
-                          : 50
-                      }
-                    />
+                    <Bar dataKey="healthScore" fill="#10B981" name="Health Score" />
+                    <Bar dataKey="efficiency" fill="#3B82F6" name="Efficiency %" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -692,24 +568,13 @@ export default function LabAnalyticsPage() {
         {/* Sensor Charts */}
         {chartData && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <ChartCard
-              title="Temperature (°C)"
-              data={chartData.tempData}
-              dataKey="temperature"
-              color="#F59E0B"
-            />
-            <ChartCard
-              title="Vibration (mm/s)"
-              data={chartData.vibrationData}
-              dataKey="vibration"
-              color="#8B5CF6"
-            />
-            <ChartCard
-              title="Energy (W)"
-              data={chartData.energyData}
-              dataKey="energy"
-              color="#10B981"
-            />
+            <ChartCard title="Temperature (°C)" data={chartData.tempData} dataKey="temperature" color="#F59E0B" />
+            {chartData.vibrationData.length > 0 && (
+                <ChartCard title="Vibration (mm/s)" data={chartData.vibrationData} dataKey="vibration" color="#8B5CF6" />
+            )}
+            {chartData.energyData.length > 0 && (
+                <ChartCard title="Energy (W)" data={chartData.energyData} dataKey="energy" color="#10B981" />
+            )}
           </div>
         )}
 
@@ -717,9 +582,7 @@ export default function LabAnalyticsPage() {
         {labData.equipment && labData.equipment.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">
-                Equipment Detail View (Real-time Metrics)
-              </h3>
+              <h3 className="font-bold text-gray-900">Equipment Detail View (Real-time Metrics)</h3>
               {Object.keys(liveUpdates).length > 0 && (
                 <span className="text-xs text-green-600 flex items-center gap-1 font-bold animate-pulse">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -731,99 +594,70 @@ export default function LabAnalyticsPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Equipment
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Health
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Efficiency
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Temp
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Vib
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Energy
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Equipment</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Health</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Efficiency</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Temp</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Vib</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Energy</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Last Updated</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {labData.equipment.map((eq) => {
-                    const hasLiveData = liveUpdates[eq.id];
+                    const live = liveUpdates[eq.id];
+                    const isFresh = live && (new Date() - live.updatedAt < 5000);
+                    const displayTime = live?.timestamp || eq.status?.lastUsedAt;
+
                     return (
-                      <tr
-                        key={eq.id}
-                        className={`hover:bg-gray-50 transition-colors ${
-                          hasLiveData ? "bg-green-50/40" : ""
-                        }`}
-                      >
+                      <tr key={eq.id} className={`hover:bg-gray-50 transition-colors duration-500 ${isFresh ? "bg-green-50" : ""}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <span className="text-sm font-medium text-gray-900">
-                              {eq.name}
-                            </span>
-                            <LiveIndicator equipmentId={eq.id} />
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">{eq.name}</span>
+                            {live && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            {eq.status?.status || "OFFLINE"}
+                          <span
+                             className={`px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full text-white`}
+                             style={{ backgroundColor: STATUS_COLORS[live?.status || eq.status?.status] || STATUS_COLORS.OFFLINE }}
+                          >
+                            {live?.status || eq.status?.status || "OFFLINE"}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span
-                            className={
-                              hasLiveData ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {(eq.status?.healthScore || 0).toFixed(0)}%
-                          </span>
+                           <span className={isFresh ? "font-bold text-green-700" : ""}>
+                                {(live?.healthScore ?? eq.status?.healthScore ?? 0).toFixed(0)}%
+                            </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span
-                            className={
-                              hasLiveData ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {(eq.analyticsParams?.efficiency || 0).toFixed(0)}%
+                           <span className={isFresh ? "font-bold text-green-700" : ""}>
+                                {(live?.efficiency ?? eq.analyticsParams?.efficiency ?? 0).toFixed(0)}%
+                            </span>
+                        </td>
+                        
+                        {/* TEMPERATURE CELL */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          <span className={isFresh ? "font-bold text-green-700" : ""}>
+                            {(live?.temperature ?? eq.analyticsParams?.temperature)?.toFixed(1) ?? "N/A"}°C
                           </span>
                         </td>
+
+                        {/* VIBRATION CELL - UPDATED */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <span
-                            className={
-                              hasLiveData ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {eq.analyticsParams?.temperature?.toFixed(1) ||
-                              "N/A"}
-                          </span>
+                           <span className={isFresh ? "font-bold text-green-700" : ""}>
+                            {(live?.vibration ?? eq.analyticsParams?.vibration)?.toFixed(2) ?? "-"}
+                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <span
-                            className={
-                              hasLiveData ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {eq.analyticsParams?.vibration?.toFixed(2) || "N/A"}
-                          </span>
+
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                           {eq.analyticsParams?.energyConsumption ? eq.analyticsParams.energyConsumption.toFixed(0) : "-"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <span
-                            className={
-                              hasLiveData ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {eq.analyticsParams?.energyConsumption?.toFixed(
-                              0
-                            ) || "N/A"}
-                          </span>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                           {formatTimestamp(displayTime)}
                         </td>
                       </tr>
                     );
@@ -839,23 +673,16 @@ export default function LabAnalyticsPage() {
 }
 
 // ==========================================
-// UPDATED HELPER COMPONENTS
+// HELPER COMPONENTS
 // ==========================================
 
-// UPDATED STAT CARD: Reduced Height, Icon & Number on one line
 const StatCard = ({ icon: Icon, title, value, color = "text-blue-600" }) => (
   <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
-    {/* Icon and Number in one line */}
     <div className="flex items-center gap-3 mb-1">
-      <div className={`p-2 bg-blue-50 ${color} rounded-full`}>
-        <Icon className="w-4 h-4" />
-      </div>
+      <div className={`p-2 bg-blue-50 ${color} rounded-full`}><Icon className="w-4 h-4" /></div>
       <span className="text-xl font-bold text-gray-900">{value}</span>
     </div>
-    {/* Title in second line */}
-    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">
-      {title}
-    </span>
+    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">{title}</span>
   </div>
 );
 
@@ -867,31 +694,11 @@ const ChartCard = ({ title, data, dataKey, color }) => {
         <Activity className="w-5 h-5" style={{ color }} /> {title}
       </h3>
       <div className="h-[250px] overflow-x-auto overflow-y-hidden custom-scrollbar">
-        <div
-          style={{
-            width: `${dynamicWidth}%`,
-            minWidth: "100%",
-            height: "100%",
-          }}
-        >
+        <div style={{ width: `${dynamicWidth}%`, minWidth: "100%", height: "100%" }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#f0f0f0"
-              />
-              <XAxis
-                dataKey="shortName"
-                angle={-20}
-                textAnchor="end"
-                height={60}
-                tick={{ fontSize: 10 }}
-                interval={0}
-              />
+            <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+              <XAxis dataKey="shortName" angle={-20} textAnchor="end" height={60} tick={{ fontSize: 10 }} interval={0} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
               <Bar dataKey={dataKey} fill={color} />
