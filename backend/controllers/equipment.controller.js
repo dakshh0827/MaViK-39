@@ -1,3 +1,5 @@
+// backend/controllers/equipment.controller.js
+
 import prisma from "../config/database.js";
 import logger from "../utils/logger.js";
 import { filterDataByRole } from "../middlewares/rbac.js";
@@ -6,9 +8,43 @@ const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-/**
- * Maps department to its corresponding equipment name field in the schema
- */
+// --- METRICS CALCULATION FORMULA ---
+export const calculateMetrics = (temp, vib, energy) => {
+  // Default baselines
+  const t = temp || 0;
+  const v = vib || 0;
+  const e = energy || 0;
+
+  // --- Health Score Calculation ---
+  // Baseline: 100
+  // Penalties:
+  // - Temperature: -1.5 point for every degree above 50°C
+  // - Vibration: -5 points for every unit of vibration
+  // - Energy: Small penalty for very high consumption (assuming > 500 is stress)
+  let healthPenalties = 0;
+  
+  if (t > 50) healthPenalties += (t - 50) * 1.5;
+  healthPenalties += v * 5; 
+  if (e > 500) healthPenalties += (e - 500) * 0.05;
+
+  const healthScore = Math.max(0, Math.min(100, 100 - healthPenalties));
+
+  // --- Efficiency Calculation ---
+  // Baseline: 100
+  // Efficiency drops significantly with vibration (mechanical loss) and extreme heat (thermal loss)
+  let efficiencyPenalties = 0;
+  
+  efficiencyPenalties += v * 8; // Vibration kills efficiency
+  if (t > 60) efficiencyPenalties += (t - 60) * 2; // Thermal loss
+
+  const efficiency = Math.max(0, Math.min(100, 100 - efficiencyPenalties));
+
+  return { 
+    healthScore: parseFloat(healthScore.toFixed(1)), 
+    efficiency: parseFloat(efficiency.toFixed(1)) 
+  };
+};
+
 const DEPARTMENT_TO_FIELD_MAP = {
   FITTER_MANUFACTURING: "fitterEquipmentName",
   ELECTRICAL_ENGINEERING: "electricalEquipmentName",
@@ -21,9 +57,6 @@ const DEPARTMENT_TO_FIELD_MAP = {
   AUTOMOTIVE_MECHANIC: "automotiveEquipmentName",
 };
 
-/**
- * Helper to build department-specific equipment name field
- */
 const buildDepartmentField = (department, equipmentName) => {
   const fieldName = DEPARTMENT_TO_FIELD_MAP[department];
   if (!fieldName || !equipmentName) {
@@ -32,9 +65,6 @@ const buildDepartmentField = (department, equipmentName) => {
   return { [fieldName]: equipmentName };
 };
 
-/**
- * Helper to clear all department-specific fields
- */
 const clearAllDepartmentFields = () => {
   const clearFields = {};
   Object.values(DEPARTMENT_TO_FIELD_MAP).forEach((field) => {
@@ -57,14 +87,10 @@ class EquipmentController {
     } = req.query;
     const skip = (page - 1) * limit;
 
-    // Get the base filter from RBAC
     const roleFilter = filterDataByRole(req);
 
-    // Build where clause for equipment
     const where = {
       ...roleFilter,
-      // FIXED: Removed invalid { labId: { not: null } } check.
-      // If labId is required in schema, this check is invalid. If optional, omit it to get all.
       ...(department && { department }),
       ...(search && {
         OR: [
@@ -76,35 +102,26 @@ class EquipmentController {
       isActive: true,
     };
 
-    // Add lab filter if provided
     if (labId && req.user.role !== "TRAINER") {
       const lab = await prisma.lab.findUnique({ where: { labId } });
-      if (lab) {
-        where.labId = lab.id;
-      }
+      if (lab) where.labId = lab.id;
     }
 
-    // Add institute filter
     if (req.user.role !== "TRAINER" && institute) {
-      where.lab = {
-        ...(where.lab || {}),
-        institute,
-      };
+      where.lab = { ...(where.lab || {}), institute };
     }
 
-    // Filter by status through the relation
     if (status) {
-      where.status = {
-        status: status,
-      };
+      where.status = { status: status };
     }
 
     try {
-      const [equipment, total] = await Promise.all([
+      const [equipmentRaw, total] = await Promise.all([
         prisma.equipment.findMany({
           where,
           include: {
             status: true,
+            analyticsParams: true, // Needed for calculation
             lab: {
               select: {
                 labId: true,
@@ -127,6 +144,31 @@ class EquipmentController {
         prisma.equipment.count({ where }),
       ]);
 
+      // Calculate Metrics dynamically
+      const equipment = equipmentRaw.map(eq => {
+        const params = eq.analyticsParams || {};
+        const statusObj = eq.status || {};
+        
+        // Use params if available, else status (for backward compatibility)
+        const temp = params.temperature ?? statusObj.temperature ?? 0;
+        const vib = params.vibration ?? statusObj.vibration ?? 0;
+        const energy = params.energyConsumption ?? statusObj.energyConsumption ?? 0;
+
+        const { healthScore, efficiency } = calculateMetrics(temp, vib, energy);
+
+        return {
+          ...eq,
+          status: {
+            ...eq.status,
+            healthScore: healthScore // Override DB value
+          },
+          analyticsParams: {
+            ...eq.analyticsParams,
+            efficiency: efficiency // Override DB value
+          }
+        };
+      });
+
       res.json({
         success: true,
         data: equipment,
@@ -148,13 +190,13 @@ class EquipmentController {
     const { id } = req.params;
     const roleFilter = filterDataByRole(req);
 
-    const equipment = await prisma.equipment.findFirst({
+    let equipment = await prisma.equipment.findFirst({
       where: { id, ...roleFilter, isActive: true },
       include: {
         status: true,
         lab: {
           select: {
-            labId: true, // Public labId
+            labId: true,
             name: true,
             institute: true,
             department: true,
@@ -182,7 +224,7 @@ class EquipmentController {
           orderBy: { date: "desc" },
           take: 7,
         },
-        analyticsParams: true, // Include department analytics
+        analyticsParams: true,
       },
     });
 
@@ -193,173 +235,150 @@ class EquipmentController {
       });
     }
 
+    // Dynamic Calculation
+    const params = equipment.analyticsParams || {};
+    const statusObj = equipment.status || {};
+    const temp = params.temperature ?? statusObj.temperature ?? 0;
+    const vib = params.vibration ?? statusObj.vibration ?? 0;
+    const energy = params.energyConsumption ?? statusObj.energyConsumption ?? 0;
+
+    const { healthScore, efficiency } = calculateMetrics(temp, vib, energy);
+
+    // Apply calculated values
+    if (equipment.status) equipment.status.healthScore = healthScore;
+    if (equipment.analyticsParams) equipment.analyticsParams.efficiency = efficiency;
+    
+    // Also inject into root for easier access if needed
+    equipment.calculatedHealth = healthScore;
+    equipment.calculatedEfficiency = efficiency;
+
     res.json({
       success: true,
       data: equipment,
     });
   });
 
-  // Create new equipment
-// Update the createEquipment function in equipment.controller.js
-
-createEquipment = asyncHandler(async (req, res) => {
-  const {
-    equipmentId,
-    name,
-    department,
-    equipmentName,
-    manufacturer,
-    model,
-    serialNumber,
-    purchaseDate,
-    warrantyExpiry,
-    labId,
-    specifications,
-    imageUrl,
-  } = req.body;
-
-  // Validate equipment ID uniqueness
-  const existing = await prisma.equipment.findUnique({
-    where: { equipmentId },
-  });
-  if (existing) {
-    return res.status(409).json({
-      success: false,
-      message: "Equipment ID already exists.",
-    });
-  }
-
-  // Validate and translate labId
-  if (!labId) {
-    return res.status(400).json({
-      success: false,
-      message: "labId is required.",
-    });
-  }
-
-  const lab = await prisma.lab.findUnique({
-    where: { labId: labId.trim() },
-  });
-
-  if (!lab) {
-    return res.status(400).json({
-      success: false,
-      message: `Invalid Lab ID provided: "${labId}". Please check and try again.`,
-    });
-  }
-
-  // ===== SECURITY CHECKS =====
-  console.log("🔍 Security Check Debug:");
-  console.log("User Role:", req.user.role);
-  console.log("User Institute:", req.user.institute);
-  console.log("User Department:", req.user.department);
-  console.log("Lab InstituteId:", lab.instituteId);
-  console.log("Lab Department:", lab.department);
-
-  // Security check: LAB_MANAGER can only add to their own institute
-  if (req.user.role === "LAB_MANAGER") {
-    // Check if user has institute configured
-    if (!req.user.institute) {
-      console.error("❌ User has no institute configured");
-      return res.status(403).json({
-        success: false,
-        message: "Your account is not associated with an institute. Please contact administrator.",
-      });
-    }
-
-    // Check if user has department configured
-    if (!req.user.department) {
-      console.error("❌ User has no department configured");
-      return res.status(403).json({
-        success: false,
-        message: "Your account is not associated with a department. Please contact administrator.",
-      });
-    }
-
-    // Compare institutes (both should be strings)
-    if (lab.instituteId !== req.user.institute) {
-      console.error("❌ Institute mismatch:", {
-        userInstitute: req.user.institute,
-        labInstitute: lab.instituteId,
-        match: lab.instituteId === req.user.institute,
-      });
-      return res.status(403).json({
-        success: false,
-        message: `You can only add equipment to your own institute. Your institute: ${req.user.institute}, Lab institute: ${lab.instituteId}`,
-      });
-    }
-
-    // Compare departments
-    if (lab.department !== req.user.department) {
-      console.error("❌ Department mismatch:", {
-        userDepartment: req.user.department,
-        labDepartment: lab.department,
-        match: lab.department === req.user.department,
-      });
-      return res.status(403).json({
-        success: false,
-        message: `You can only add equipment to labs in your department. Your department: ${req.user.department}, Lab department: ${lab.department}`,
-      });
-    }
-
-    console.log("✅ Security checks passed for LAB_MANAGER");
-  }
-
-  // Validate department matches lab department
-  if (department !== lab.department) {
-    return res.status(400).json({
-      success: false,
-      message: `Equipment department must match lab department (${lab.department}).`,
-    });
-  }
-
-  // Build department-specific field
-  const departmentField = buildDepartmentField(department, equipmentName);
-
-  // Create equipment with status
-  const equipment = await prisma.equipment.create({
-    data: {
+  // Create new equipment (unchanged logic mostly, but ensured imports)
+  createEquipment = asyncHandler(async (req, res) => {
+    const {
       equipmentId,
       name,
       department,
-      ...departmentField,
+      equipmentName,
       manufacturer,
       model,
-      serialNumber: serialNumber || null,
-      purchaseDate: new Date(purchaseDate),
-      warrantyExpiry: warrantyExpiry ? new Date(warrantyExpiry) : null,
-      labId: lab.id, // Use internal ObjectId
-      specifications: specifications || null,
-      imageUrl: imageUrl || null,
-      isActive: true,
-      status: {
-        create: {
-          status: "IDLE",
-          healthScore: 100,
-          isOperatingInClass: false,
-        },
-      },
-    },
-    include: {
-      status: true,
-      lab: {
-        select: {
-          labId: true,
-          name: true,
-          institute: true,
-          department: true,
-        },
-      },
-    },
-  });
+      serialNumber,
+      purchaseDate,
+      warrantyExpiry,
+      labId,
+      specifications,
+      imageUrl,
+    } = req.body;
 
-  logger.info(`Equipment created: ${equipmentId} by ${req.user.email}`);
-  res.status(201).json({
-    success: true,
-    message: "Equipment created successfully.",
-    data: equipment,
+    const existing = await prisma.equipment.findUnique({
+      where: { equipmentId },
+    });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: "Equipment ID already exists.",
+      });
+    }
+
+    if (!labId) {
+      return res.status(400).json({
+        success: false,
+        message: "labId is required.",
+      });
+    }
+
+    const lab = await prisma.lab.findUnique({
+      where: { labId: labId.trim() },
+    });
+
+    if (!lab) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid Lab ID provided: "${labId}".`,
+      });
+    }
+
+    if (req.user.role === "LAB_MANAGER") {
+      if (!req.user.institute || !req.user.department) {
+        return res.status(403).json({
+            success: false, 
+            message: "User account incomplete."
+        });
+      }
+      if (lab.instituteId !== req.user.institute) {
+        return res.status(403).json({
+          success: false,
+          message: "Institute mismatch.",
+        });
+      }
+      if (lab.department !== req.user.department) {
+        return res.status(403).json({
+          success: false,
+          message: "Department mismatch.",
+        });
+      }
+    }
+
+    if (department !== lab.department) {
+      return res.status(400).json({
+        success: false,
+        message: `Equipment department must match lab department (${lab.department}).`,
+      });
+    }
+
+    const departmentField = buildDepartmentField(department, equipmentName);
+
+    const equipment = await prisma.equipment.create({
+      data: {
+        equipmentId,
+        name,
+        department,
+        ...departmentField,
+        manufacturer,
+        model,
+        serialNumber: serialNumber || null,
+        purchaseDate: new Date(purchaseDate),
+        warrantyExpiry: warrantyExpiry ? new Date(warrantyExpiry) : null,
+        labId: lab.id,
+        specifications: specifications || null,
+        imageUrl: imageUrl || null,
+        isActive: true,
+        status: {
+          create: {
+            status: "IDLE",
+            healthScore: 100, // Initial default
+            isOperatingInClass: false,
+          },
+        },
+        analyticsParams: {
+            create: {
+                department: department,
+                temperature: 25,
+                vibration: 0,
+                energyConsumption: 0,
+                efficiency: 100
+            }
+        }
+      },
+      include: {
+        status: true,
+        analyticsParams: true,
+        lab: true,
+      },
+    });
+
+    logger.info(`Equipment created: ${equipmentId} by ${req.user.email}`);
+    res.status(201).json({
+      success: true,
+      message: "Equipment created successfully.",
+      data: equipment,
+    });
   });
-});
 
   // Update equipment
   updateEquipment = asyncHandler(async (req, res) => {
@@ -373,13 +392,11 @@ createEquipment = asyncHandler(async (req, res) => {
       ...updateData
     } = req.body;
 
-    // Remove fields that shouldn't be updated
     delete updateData.equipmentId;
     delete updateData.createdAt;
     delete updateData.updatedAt;
     delete updateData.isActive;
 
-    // Check if equipment exists and user has access
     const roleFilter = filterDataByRole(req);
     const existingEquipment = await prisma.equipment.findFirst({
       where: { id, ...roleFilter, isActive: true },
@@ -393,15 +410,9 @@ createEquipment = asyncHandler(async (req, res) => {
       });
     }
 
-    // Handle department change
     if (department && department !== existingEquipment.department) {
-      // Clear all department-specific fields first
       Object.assign(updateData, clearAllDepartmentFields());
-
-      // Set new department
       updateData.department = department;
-
-      // Set new department-specific equipment name if provided
       if (equipmentName) {
         Object.assign(
           updateData,
@@ -409,14 +420,12 @@ createEquipment = asyncHandler(async (req, res) => {
         );
       }
     } else if (equipmentName) {
-      // Just updating equipment name for same department
       Object.assign(
         updateData,
         buildDepartmentField(existingEquipment.department, equipmentName)
       );
     }
 
-    // Handle lab change
     if (labId && labId !== existingEquipment.lab.labId) {
       const newLab = await prisma.lab.findUnique({
         where: { labId: labId.trim() },
@@ -429,64 +438,39 @@ createEquipment = asyncHandler(async (req, res) => {
         });
       }
 
-      // Security check for LAB_MANAGER
       if (req.user.role === "LAB_MANAGER") {
-        if (newLab.institute !== req.user.institute) {
+        if (newLab.institute !== req.user.institute || newLab.department !== req.user.department) {
           return res.status(403).json({
             success: false,
-            message: "You can only move equipment within your own institute.",
-          });
-        }
-
-        if (newLab.department !== req.user.department) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only move equipment to labs in your department.",
+            message: "Cannot move equipment outside your jurisdiction.",
           });
         }
       }
 
-      // Validate department matches new lab
-      const targetDepartment =
-        updateData.department || existingEquipment.department;
+      const targetDepartment = updateData.department || existingEquipment.department;
       if (targetDepartment !== newLab.department) {
         return res.status(400).json({
           success: false,
-          message: `Cannot move equipment to lab in different department. Equipment is ${targetDepartment}, lab is ${newLab.department}.`,
+          message: "Department mismatch.",
         });
       }
 
-      updateData.labId = newLab.id; // Use internal ObjectId
+      updateData.labId = newLab.id;
     }
 
-    // Handle date conversions
-    if (purchaseDate) {
-      updateData.purchaseDate = new Date(purchaseDate);
-    }
-    if (warrantyExpiry) {
-      updateData.warrantyExpiry = new Date(warrantyExpiry);
-    }
+    if (purchaseDate) updateData.purchaseDate = new Date(purchaseDate);
+    if (warrantyExpiry) updateData.warrantyExpiry = new Date(warrantyExpiry);
 
-    // Update equipment
     const equipment = await prisma.equipment.update({
       where: { id },
       data: updateData,
       include: {
         status: true,
-        lab: {
-          select: {
-            labId: true,
-            name: true,
-            institute: true,
-            department: true,
-          },
-        },
+        lab: true,
+        analyticsParams: true
       },
     });
 
-    logger.info(
-      `Equipment updated: ${equipment.equipmentId} by ${req.user.email}`
-    );
     res.json({
       success: true,
       message: "Equipment updated successfully.",
@@ -494,11 +478,9 @@ createEquipment = asyncHandler(async (req, res) => {
     });
   });
 
-  // Delete equipment (soft delete)
+  // Delete equipment
   deleteEquipment = asyncHandler(async (req, res) => {
     const { id } = req.params;
-
-    // Check access first
     const roleFilter = filterDataByRole(req);
     const equipment = await prisma.equipment.findFirst({
       where: { id, ...roleFilter, isActive: true },
@@ -511,7 +493,6 @@ createEquipment = asyncHandler(async (req, res) => {
       });
     }
 
-    // Soft delete
     await prisma.equipment.update({
       where: { id },
       data: { isActive: false },
@@ -529,37 +510,23 @@ createEquipment = asyncHandler(async (req, res) => {
   // Get equipment statistics
   getEquipmentStats = asyncHandler(async (req, res) => {
     const roleFilter = filterDataByRole(req);
-
-    // Build where clause for stats
     const statsWhere = {
       ...roleFilter,
-      // FIXED: Removed the invalid { labId: { not: null } } check here as well
       isActive: true,
     };
 
     const [total, byStatus, byDepartment, criticalAlerts] = await Promise.all([
-      // Total equipment count
-      prisma.equipment.count({
-        where: statsWhere,
-      }),
-
-      // Count by status
+      prisma.equipment.count({ where: statsWhere }),
       prisma.equipmentStatus.groupBy({
         by: ["status"],
-        where: {
-          equipment: statsWhere,
-        },
+        where: { equipment: statsWhere },
         _count: true,
       }),
-
-      // Count by department
       prisma.equipment.groupBy({
         by: ["department"],
         where: statsWhere,
         _count: true,
       }),
-
-      // Critical unresolved alerts
       prisma.alert.count({
         where: {
           equipment: statsWhere,
@@ -569,7 +536,6 @@ createEquipment = asyncHandler(async (req, res) => {
       }),
     ]);
 
-    // Format status counts
     const statusCounts = byStatus.reduce((acc, s) => {
       acc[s.status] = s._count;
       return acc;

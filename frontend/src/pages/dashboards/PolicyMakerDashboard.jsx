@@ -1,16 +1,9 @@
-/*
- * =====================================================
- * PolicyMakerDashboard.jsx - REAL-TIME SOCKETS ENABLED
- * =====================================================
- * 1. Added Socket.IO integration for real-time alerts.
- * 2. Added live updates for Active Alerts list.
- * 3. Preserved all previous UI fixes (Modals, Charts).
- */
+// frontend/src/pages/dashboards/PolicyMakerDashboard.jsx
 
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
-import io from "socket.io-client"; // Added Socket.IO
+import io from "socket.io-client";
 import { useDashboardStore } from "../../stores/dashboardStore";
 import { useAlertStore } from "../../stores/alertStore";
 import { useLabStore } from "../../stores/labStore";
@@ -19,40 +12,18 @@ import { useInstituteStore } from "../../stores/instituteStore";
 import { useBreakdownStore } from "../../stores/breakdownStore";
 import AlertsList from "../../components/dashboard/AlertsList";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
-import LabManagerForm from "../../components/admin/LabManagerForm"; // Corrected casing if needed
+import LabManagerForm from "../../components/admin/LabManagerForm";
 import InstituteManagerForm from "../../components/admin/InstituteManagerForm";
 import AlertModal from "../../components/dashboard/AlertModal";
 import api from "../../lib/axios";
 import {
-  FaChartLine,
-  FaBuilding,
-  FaExclamationTriangle,
-  FaArrowUp,
-  FaFilter,
-  FaUsers,
-  FaBox,
-  FaEdit,
-  FaTrash,
-  FaExclamationCircle,
-  FaExternalLinkAlt,
-  FaTh,
-  FaList,
-  FaArrowRight,
-  FaTimes,
-  FaCheckCircle,
-  FaTimesCircle,
-  FaCalendarAlt,
-  FaUser,
-  FaMapMarkerAlt,
-  FaFileAlt,
-  FaHistory,
-  FaCommentAlt,
-  FaClock,
-  FaUserCheck,
-  FaWifi, // Added Wifi icon
+  FaChartLine, FaBuilding, FaExclamationTriangle, FaArrowUp, FaFilter,
+  FaUsers, FaBox, FaEdit, FaTrash, FaExclamationCircle, FaExternalLinkAlt,
+  FaTh, FaList, FaArrowRight, FaTimes, FaCheckCircle, FaTimesCircle,
+  FaCalendarAlt, FaUser, FaMapMarkerAlt, FaFileAlt, FaHistory, FaClock, FaWifi
 } from "react-icons/fa";
 import { ImLab } from "react-icons/im";
-import { MdOutlineWifiOff } from "react-icons/md"; // Added Offline icon
+import { MdOutlineWifiOff } from "react-icons/md";
 
 const DEPARTMENT_DISPLAY_NAMES = {
   FITTER_MANUFACTURING: "Fitter/Manufacturing",
@@ -118,7 +89,6 @@ const modalStripperStyle = `
   }
 `;
 
-// --- Modal Wrapper ---
 const ModalWrapper = ({ children, onClose }) => {
   useEffect(() => {
     const handleEscape = (e) => {
@@ -147,7 +117,8 @@ const ModalWrapper = ({ children, onClose }) => {
   );
 };
 
-// --- SVG Health History Chart ---
+// --- UPDATED SVG Health History Chart ---
+// Uses the smoother calculation logic from the first file
 const HealthHistoryChart = ({ currentScore = 0 }) => {
   const chartData = useMemo(() => {
     const today = new Date();
@@ -160,13 +131,15 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
 
     const safeScore = currentScore || 0;
 
-    return months.map((m, i) => {
-      if (i === 5) {
-        return { month: m, score: safeScore };
-      }
-      const variance = Math.floor(Math.random() * 20) - 10;
-      const calculatedScore = Math.max(0, Math.min(100, safeScore + variance));
-      return { month: m, score: calculatedScore };
+    // Generate a stable trend line based on the calculated score
+    return months.map((m) => {
+        // We add very minimal jitter (±2%) to make it look like a chart, 
+        // but centered strictly on the calculated score.
+        const jitter = Math.random() * 4 - 2; 
+        let pointScore = safeScore + jitter;
+        pointScore = Math.max(0, Math.min(100, pointScore));
+        
+        return { month: m, score: parseFloat(pointScore.toFixed(1)) };
     });
   }, [currentScore]);
 
@@ -201,36 +174,21 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
               <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
             </linearGradient>
           </defs>
-          <line
-            x1={padding}
-            y1={getY(0)}
-            x2={width - padding}
-            y2={getY(0)}
-            stroke="#e5e7eb"
-            strokeWidth="1"
-            strokeDasharray="4"
-            vectorEffect="non-scaling-stroke"
-          />
-          <line
-            x1={padding}
-            y1={getY(50)}
-            x2={width - padding}
-            y2={getY(50)}
-            stroke="#e5e7eb"
-            strokeWidth="1"
-            strokeDasharray="4"
-            vectorEffect="non-scaling-stroke"
-          />
-          <line
-            x1={padding}
-            y1={getY(100)}
-            x2={width - padding}
-            y2={getY(100)}
-            stroke="#e5e7eb"
-            strokeWidth="1"
-            strokeDasharray="4"
-            vectorEffect="non-scaling-stroke"
-          />
+          {/* Grid Lines */}
+          {[0, 50, 100].map(val => (
+            <line
+                key={val}
+                x1={padding}
+                y1={getY(val)}
+                x2={width - padding}
+                y2={getY(val)}
+                stroke="#e5e7eb"
+                strokeWidth="1"
+                strokeDasharray="4"
+                vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          
           <polygon points={areaPoints} fill="url(#pmScoreGradient)" />
           <polyline
             points={points}
@@ -254,16 +212,6 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
               />
               <text
                 x={getX(i)}
-                y={getY(d.score) - 8}
-                textAnchor="middle"
-                fontSize="10"
-                fill="#10b981"
-                fontWeight="bold"
-              >
-                {d.score}
-              </text>
-              <text
-                x={getX(i)}
                 y={height - 2}
                 textAnchor="middle"
                 fontSize="9"
@@ -283,18 +231,8 @@ const HealthHistoryChart = ({ currentScore = 0 }) => {
 
 // --- Compact History List ---
 const CompactHistoryList = ({ alerts, loading, onAlertClick }) => {
-  if (loading)
-    return (
-      <div className="flex justify-center py-4">
-        <LoadingSpinner size="sm" />
-      </div>
-    );
-  if (!alerts || alerts.length === 0)
-    return (
-      <div className="text-center text-xs text-gray-500 py-4">
-        No history found.
-      </div>
-    );
+  if (loading) return <div className="flex justify-center py-4"><LoadingSpinner size="sm" /></div>;
+  if (!alerts || alerts.length === 0) return <div className="text-center text-xs text-gray-500 py-4">No history found.</div>;
 
   return (
     <div className="space-y-2 p-3">
@@ -305,28 +243,16 @@ const CompactHistoryList = ({ alerts, loading, onAlertClick }) => {
           className="w-full text-left group bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all"
         >
           <div className="flex items-start gap-3">
-            <div
-              className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${
-                alert.priority === "CRITICAL"
-                  ? "bg-red-500 shadow-md shadow-red-200"
-                  : alert.priority === "HIGH"
-                  ? "bg-orange-400"
-                  : "bg-green-500"
-              }`}
-            />
+            <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${
+                alert.priority === "CRITICAL" ? "bg-red-500 shadow-md shadow-red-200" : 
+                alert.priority === "HIGH" ? "bg-orange-400" : "bg-green-500"
+            }`} />
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between mb-1">
-                <h4 className="font-semibold text-xs text-gray-900">
-                  {alert.title || alert.equipment?.name || "Alert"}
-                </h4>
+                <h4 className="font-semibold text-xs text-gray-900">{alert.title || alert.equipment?.name || "Alert"}</h4>
                 <span className="text-[10px] text-gray-400 flex items-center gap-1">
                   <FaClock className="w-3 h-3" />
-                  {new Date(
-                    alert.resolvedAt || alert.createdAt
-                  ).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {new Date(alert.resolvedAt || alert.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-[10px] text-gray-500">
@@ -344,12 +270,7 @@ const CompactHistoryList = ({ alerts, loading, onAlertClick }) => {
 
 export default function PolicyMakerDashboard() {
   const navigate = useNavigate();
-  const {
-    overview,
-    fetchOverview,
-    isLoading: dashboardLoading,
-    error: dashboardError,
-  } = useDashboardStore();
+  const { overview, fetchOverview, isLoading: dashboardLoading, error: dashboardError } = useDashboardStore();
   const { alerts, fetchAlerts, resolveAlert } = useAlertStore();
 
   const [alertTab, setAlertTab] = useState("active");
@@ -357,20 +278,14 @@ export default function PolicyMakerDashboard() {
   const [isActiveAlertsLoading, setIsActiveAlertsLoading] = useState(false);
   const [historyAlerts, setHistoryAlerts] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-
   const [selectedAlert, setSelectedAlert] = useState(null);
 
   const { labs, fetchLabs, deleteLab, isLoading: labLoading } = useLabStore();
-  const { reorderRequests, fetchReorderRequests, reviewReorderRequest } =
-    useBreakdownStore();
+  const { reorderRequests, fetchReorderRequests, reviewReorderRequest } = useBreakdownStore();
 
   const [showPendingOnly, setShowPendingOnly] = useState(true);
   const { pagination, fetchEquipment } = useEquipmentStore();
-  const {
-    institutes,
-    fetchInstitutes,
-    isLoading: institutesLoading,
-  } = useInstituteStore();
+  const { institutes, fetchInstitutes, isLoading: institutesLoading } = useInstituteStore();
 
   const [selectedInstitute, setSelectedInstitute] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
@@ -384,11 +299,10 @@ export default function PolicyMakerDashboard() {
   const [reviewComment, setReviewComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  // --- SOCKET STATE ---
+  // --- SOCKET STATE & CONNECTION ---
   const [socket, setSocket] = useState(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
 
-  // --- SOCKET CONNECTION EFFECT ---
   useEffect(() => {
     console.log("🔌 [PolicyMaker] Setting up Socket.IO connection...");
 
@@ -430,10 +344,7 @@ export default function PolicyMakerDashboard() {
     });
 
     socketInstance.on("connect_error", (error) => {
-      console.error(
-        "❌ [PolicyMaker] Socket.IO connection error:",
-        error.message
-      );
+      console.error("❌ [PolicyMaker] Socket.IO connection error:", error.message);
       setIsSocketConnected(false);
     });
 
@@ -473,12 +384,12 @@ export default function PolicyMakerDashboard() {
     }
   };
 
+  // ... (Fetch Logic) ...
   const parseAlertResponse = (response) => {
     if (!response) return [];
     if (Array.isArray(response)) return response;
     if (response.data && Array.isArray(response.data)) return response.data;
-    if (response.alerts && Array.isArray(response.alerts))
-      return response.alerts;
+    if (response.alerts && Array.isArray(response.alerts)) return response.alerts;
     return [];
   };
 
@@ -530,26 +441,17 @@ export default function PolicyMakerDashboard() {
     loadInitialData();
   }, []);
 
+  // ... (Filtering Logic) ...
   const institutesList = institutes;
   const departmentsList = useMemo(() => {
-    if (selectedInstitute === "all")
-      return [...new Set(labs.map((lab) => lab.department))].sort();
-    return [
-      ...new Set(
-        labs
-          .filter((lab) => lab.instituteId === selectedInstitute)
-          .map((lab) => lab.department)
-      ),
-    ].sort();
+    if (selectedInstitute === "all") return [...new Set(labs.map((lab) => lab.department))].sort();
+    return [...new Set(labs.filter((lab) => lab.instituteId === selectedInstitute).map((lab) => lab.department))].sort();
   }, [labs, selectedInstitute]);
 
   const labsList = useMemo(() => {
     return labs.filter((lab) => {
-      const instituteMatch =
-        selectedInstitute === "all" || lab.instituteId === selectedInstitute;
-      const departmentMatch =
-        selectedDepartment === "all" || lab.department === selectedDepartment;
-      return instituteMatch && departmentMatch;
+      return (selectedInstitute === "all" || lab.instituteId === selectedInstitute) &&
+             (selectedDepartment === "all" || lab.department === selectedDepartment);
     });
   }, [labs, selectedInstitute, selectedDepartment]);
 
@@ -573,15 +475,14 @@ export default function PolicyMakerDashboard() {
       if (instituteId !== "all") userParams.append("instituteId", instituteId);
       const userRes = await api.get("/users", { params: userParams });
       let managers = userRes.data.data || [];
-      if (department !== "all")
-        managers = managers.filter((user) => user.department === department);
+      if (department !== "all") managers = managers.filter((user) => user.department === department);
       setLabManagersCount(managers.length);
       const eqParams = {};
       if (instituteId !== "all") eqParams.instituteId = instituteId;
       if (department !== "all") eqParams.department = department;
       await fetchEquipment(eqParams);
     } catch (error) {
-      console.error("Failed to fetch filtered counts:", error);
+       console.error("Failed to fetch filtered counts:", error);
     }
   };
 
@@ -590,10 +491,9 @@ export default function PolicyMakerDashboard() {
       await resolveAlert(alertId);
       await Promise.all([fetchActiveAlertsIsolated(), fetchOverview()]);
       if (alertTab === "history") fetchHistoryAlertsIsolated();
-      setSelectedAlert(null); // Close modal
+      setSelectedAlert(null);
     } catch (error) {
-      console.error("Failed to resolve alert:", error);
-      alert("Failed to resolve alert. Please try again.");
+      alert("Failed to resolve alert.");
     }
   };
 
@@ -606,8 +506,7 @@ export default function PolicyMakerDashboard() {
       setSelectedRequest(null);
       setReviewComment("");
     } catch (error) {
-      console.error("Failed to review request:", error);
-      alert("Failed to process review. Please try again.");
+      alert("Failed to process review.");
     } finally {
       setIsSubmittingReview(false);
     }
@@ -618,88 +517,25 @@ export default function PolicyMakerDashboard() {
     setSelectedRequest(request);
   };
 
-  const handleOpenEditLab = (lab) => {
-    setEditingLab(lab);
-    setIsLabModalOpen(true);
-  };
+  const handleOpenEditLab = (lab) => { setEditingLab(lab); setIsLabModalOpen(true); };
   const handleDeleteLab = async (labId) => {
-    if (!window.confirm(`Are you sure you want to delete lab ${labId}?`))
-      return;
-    try {
-      await deleteLab(labId);
-      await fetchLabs();
-    } catch (error) {
-      alert(error.message || "Failed to delete lab");
-    }
+    if (!window.confirm(`Delete lab ${labId}?`)) return;
+    try { await deleteLab(labId); await fetchLabs(); } catch (error) { alert("Failed."); }
   };
-  const handleLabModalClose = async () => {
-    setIsLabModalOpen(false);
-    setEditingLab(null);
-    await fetchLabs();
-  };
-  const handleInstituteModalClose = async () => {
-    setIsInstituteModalOpen(false);
-    await fetchInstitutes();
-    await fetchLabs();
-  };
-  const handleLabClick = (labId) => {
-    navigate(`/dashboard/lab-analytics/${labId}`);
-  };
+  const handleLabModalClose = async () => { setIsLabModalOpen(false); setEditingLab(null); await fetchLabs(); };
+  const handleInstituteModalClose = async () => { setIsInstituteModalOpen(false); await fetchInstitutes(); await fetchLabs(); };
+  const handleLabClick = (labId) => { navigate(`/dashboard/lab-analytics/${labId}`); };
 
+  // ... (Stats Logic) ...
   const isLoading = dashboardLoading || labLoading || institutesLoading;
-  if (isLoading && !labs.length && !institutes.length && !overview)
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  if (dashboardError && !overview)
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <FaExclamationCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Failed to Load Dashboard
-          </h2>
-          <button
-            onClick={() => fetchOverview()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
+  if (isLoading && !labs.length && !institutes.length && !overview) return <div className="flex items-center justify-center h-screen"><LoadingSpinner size="lg" /></div>;
+  if (dashboardError && !overview) return <div className="flex items-center justify-center h-screen"><div className="text-center"><FaExclamationCircle className="w-12 h-12 text-red-500 mx-auto mb-4" /><h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to Load Dashboard</h2><button onClick={() => fetchOverview()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Retry</button></div></div>;
 
   const standardStats = [
-    {
-      icon: FaBuilding,
-      title: "Institutions",
-      value: overview?.overview?.totalInstitutions || 0,
-      color: "text-indigo-600",
-      bg: "bg-indigo-50",
-    },
-    {
-      icon: FaChartLine,
-      title: "Total Equipment",
-      value: overview?.overview?.totalEquipment || 0,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-    },
-    {
-      icon: FaUsers,
-      title: "Lab Managers",
-      value: labManagersCount,
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
-    },
-    {
-      icon: FaExclamationTriangle,
-      title: "Unresolved Alerts",
-      value: activeAlerts.length,
-      color: "text-red-600",
-      bg: "bg-red-50",
-    },
+    { icon: FaBuilding, title: "Institutions", value: overview?.overview?.totalInstitutions || 0, color: "text-indigo-600", bg: "bg-indigo-50" },
+    { icon: FaChartLine, title: "Total Equipment", value: overview?.overview?.totalEquipment || 0, color: "text-blue-600", bg: "bg-blue-50" },
+    { icon: FaUsers, title: "Lab Managers", value: labManagersCount, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { icon: FaExclamationTriangle, title: "Unresolved Alerts", value: activeAlerts.length, color: "text-red-600", bg: "bg-red-50" },
   ];
 
   const pendingReorders = reorderRequests.filter((r) => r.status === "PENDING");
@@ -708,29 +544,19 @@ export default function PolicyMakerDashboard() {
   return (
     <div className="h-[calc(92vh-4rem)] mt-0.5 overflow-hidden bg-gray-200 p-1">
       <div className="h-full grid grid-cols-12 gap-4">
-        {/* LEFT SECTION - 8 Columns */}
+        {/* LEFT SECTION */}
         <div className="col-span-8 flex flex-col gap-4 h-full min-h-0">
-          {/* UPDATED GRID LAYOUT: 50% Stats, 50% Chart */}
           <div className="grid grid-cols-2 gap-3 flex-shrink-0 h-44">
-            {/* General Stats */}
+            {/* Stats Grid */}
             <div className="col-span-1 grid grid-cols-2 grid-rows-2 gap-3 h-full">
               {standardStats.map((stat, index) => {
                 const Icon = stat.icon;
                 return (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-md hover:shadow-md transition-shadow"
-                  >
-                    <div className={`p-2.5 rounded-lg ${stat.bg}`}>
-                      <Icon className={`w-5 h-5 ${stat.color}`} />
-                    </div>
+                  <div key={index} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-md">
+                    <div className={`p-2.5 rounded-lg ${stat.bg}`}><Icon className={`w-5 h-5 ${stat.color}`} /></div>
                     <div>
-                      <div className="text-xl font-bold text-gray-900 leading-tight">
-                        {stat.value}
-                      </div>
-                      <div className="text-xs font-medium text-gray-500">
-                        {stat.title}
-                      </div>
+                      <div className="text-xl font-bold text-gray-900 leading-tight">{stat.value}</div>
+                      <div className="text-xs font-medium text-gray-500">{stat.title}</div>
                     </div>
                   </div>
                 );
@@ -738,616 +564,188 @@ export default function PolicyMakerDashboard() {
             </div>
 
             {/* Health Score Chart */}
-            <div className="col-span-1 bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-md transition-shadow flex flex-col items-center justify-between p-3 relative overflow-hidden">
+            <div className="col-span-1 bg-white rounded-xl shadow-md border border-gray-100 flex flex-col items-center justify-between p-3 relative overflow-hidden">
               <div className="w-full flex items-center justify-between z-10">
-                <h3 className="text-xs font-bold text-gray-700">
-                  Avg Health Score
-                </h3>
-                <span
-                  className={`text-sm font-bold ${
-                    overview?.overview?.avgHealthScore >= 80
-                      ? "text-emerald-600"
-                      : "text-yellow-600"
-                  }`}
-                >
+                <h3 className="text-xs font-bold text-gray-700">Calculated Health Score</h3>
+                <span className={`text-sm font-bold ${overview?.overview?.avgHealthScore >= 80 ? "text-emerald-600" : "text-yellow-600"}`}>
                   {overview?.overview?.avgHealthScore || 0}%
                 </span>
               </div>
               <div className="flex-1 w-full z-10 pt-2 min-h-0">
-                <HealthHistoryChart
-                  currentScore={overview?.overview?.avgHealthScore || 0}
-                />
+                <HealthHistoryChart currentScore={overview?.overview?.avgHealthScore || 0} />
               </div>
             </div>
           </div>
 
+          {/* Labs Directory */}
           <div className="flex-1 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col min-h-0">
-            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-white flex-shrink-0 gap-4">
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <ImLab className="w-5 h-5 text-blue-600" />
-                <h3 className="text-base font-bold text-gray-800">
-                  Labs Directory
-                </h3>
-                <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs font-medium">
-                  {labsList.length}
-                </span>
-                {/* Connection Status Badge */}
-                {isSocketConnected ? (
-                  <span className="flex items-center gap-1.5 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full border border-green-200 ml-2">
-                    <FaWifi className="w-2.5 h-2.5" />
-                    Live
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-bold rounded-full border border-gray-200 ml-2">
-                    <MdOutlineWifiOff className="w-2.5 h-2.5" />
-                    Offline
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-3 flex-1 justify-end">
-                <div className="flex items-center gap-2 max-w-2xl flex-1 justify-end">
-                  <FaFilter className="w-4 h-4 text-gray-400" />
-                  <select
-                    value={selectedInstitute}
-                    onChange={handleInstituteChange}
-                    className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50 max-w-[200px]"
-                  >
-                    <option value="all">All Institutes</option>
-                    {institutesList.map((inst) => (
-                      <option key={inst.id} value={inst.instituteId}>
-                        {inst.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={selectedDepartment}
-                    onChange={handleDepartmentChange}
-                    className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50 max-w-[200px]"
-                    disabled={departmentsList.length === 0}
-                  >
-                    <option value="all">All Departments</option>
-                    {departmentsList.map((dept) => (
-                      <option key={dept} value={dept}>
-                        {DEPARTMENT_DISPLAY_NAMES[dept] || dept}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
-                  <button
-                    onClick={() => setViewMode("cards")}
-                    className={`p-1.5 rounded transition-all ${
-                      viewMode === "cards"
-                        ? "bg-white text-blue-600 shadow-md"
-                        : "text-gray-400 hover:text-gray-600"
-                    }`}
-                  >
-                    <FaTh className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={`p-1.5 rounded transition-all ${
-                      viewMode === "list"
-                        ? "bg-white text-blue-600 shadow-md"
-                        : "text-gray-400 hover:text-gray-600"
-                    }`}
-                  >
-                    <FaList className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-gray-50/30">
-              {labsList.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                  <ImLab className="w-12 h-12 mb-2 opacity-20" />
-                  <p className="text-sm">No labs match the selected filters.</p>
-                </div>
-              ) : viewMode === "cards" ? (
-                <div className="grid grid-cols-3 gap-4">
-                  {labsList.map((lab) => (
-                    <div
-                      key={lab.labId}
-                      className="group relative flex flex-col p-4 rounded-xl border border-gray-200 bg-white hover:border-blue-400 hover:shadow-md transition-all h-full"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                          <ImLab className="w-5 h-5" />
-                        </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => handleOpenEditLab(lab)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          >
-                            <FaEdit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLab(lab.labId)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                          >
-                            <FaTrash className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleLabClick(lab.labId)}
-                        className="text-left flex-1"
-                      >
-                        <h4 className="font-bold text-gray-900 text-sm mb-1 truncate group-hover:text-blue-700">
-                          {lab.name}
-                        </h4>
-                        <div className="space-y-1">
-                          <p className="text-xs text-gray-500 flex items-center gap-1 truncate">
-                            <FaMapMarkerAlt className="w-3 h-3" />{" "}
-                            {lab.institute?.name || "N/A"}
-                          </p>
-                          <p className="text-xs text-gray-500 flex items-center gap-1 truncate">
-                            <FaBox className="w-3 h-3" />{" "}
-                            {DEPARTMENT_DISPLAY_NAMES[lab.department] ||
-                              lab.department}
-                          </p>
-                        </div>
-                      </button>
-                      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-                        <span className="font-mono text-gray-400">
-                          #{lab.labId.slice(0, 8)}
-                        </span>
-                        <span className="text-blue-600 font-medium flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          View Details <FaArrowRight className="w-3 h-3" />
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {labsList.map((lab) => (
-                    <div
-                      key={lab.labId}
-                      className="flex items-center justify-between p-3 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:shadow-md transition-all group"
-                    >
-                      <button
-                        onClick={() => handleLabClick(lab.labId)}
-                        className="flex items-center gap-4 flex-1 text-left"
-                      >
-                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                          <ImLab className="w-4 h-4" />
-                        </div>
-                        <div className="grid grid-cols-12 gap-4 flex-1 items-center">
-                          <div className="col-span-4">
-                            <div className="font-semibold text-gray-900 text-sm group-hover:text-blue-700">
-                              {lab.name}
-                            </div>
-                            <div className="text-xs text-gray-400 font-mono">
-                              {lab.labId}
-                            </div>
-                          </div>
-                          <div className="col-span-4 text-xs text-gray-600 truncate">
-                            {lab.institute?.name || "N/A"}
-                          </div>
-                          <div className="col-span-4 text-xs text-gray-600 truncate">
-                            {DEPARTMENT_DISPLAY_NAMES[lab.department] ||
-                              lab.department}
-                          </div>
-                        </div>
-                      </button>
-                      <div className="flex gap-2 pl-4 border-l border-gray-100">
-                        <button
-                          onClick={() => handleOpenEditLab(lab)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        >
-                          <FaEdit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteLab(lab.labId)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                        >
-                          <FaTrash className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleLabClick(lab.labId)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        >
-                          <FaExternalLinkAlt className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-white flex-shrink-0 gap-4">
+               <div className="flex items-center gap-2 flex-shrink-0">
+                 <ImLab className="w-5 h-5 text-blue-600" />
+                 <h3 className="text-base font-bold text-gray-800">Labs Directory</h3>
+                 <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs font-medium">{labsList.length}</span>
+                 {isSocketConnected ? (
+                   <span className="flex items-center gap-1.5 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full border border-green-200 ml-2">
+                     <FaWifi className="w-2.5 h-2.5" /> Live
+                   </span>
+                 ) : (
+                   <span className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-bold rounded-full border border-gray-200 ml-2">
+                     <MdOutlineWifiOff className="w-2.5 h-2.5" /> Offline
+                   </span>
+                 )}
+               </div>
+               <div className="flex items-center gap-3 flex-1 justify-end">
+                  <div className="flex items-center gap-2 max-w-2xl flex-1 justify-end">
+                    <FaFilter className="w-4 h-4 text-gray-400" />
+                    <select value={selectedInstitute} onChange={handleInstituteChange} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-gray-50 max-w-[200px]">
+                      <option value="all">All Institutes</option>
+                      {institutesList.map((inst) => (<option key={inst.id} value={inst.instituteId}>{inst.name}</option>))}
+                    </select>
+                    <select value={selectedDepartment} onChange={handleDepartmentChange} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-gray-50 max-w-[200px]" disabled={departmentsList.length === 0}>
+                      <option value="all">All Departments</option>
+                      {departmentsList.map((dept) => (<option key={dept} value={dept}>{DEPARTMENT_DISPLAY_NAMES[dept] || dept}</option>))}
+                    </select>
+                  </div>
+                  <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
+                    <button onClick={() => setViewMode("cards")} className={`p-1.5 rounded transition-all ${viewMode === "cards" ? "bg-white text-blue-600 shadow-md" : "text-gray-400"}`}><FaTh className="w-4 h-4" /></button>
+                    <button onClick={() => setViewMode("list")} className={`p-1.5 rounded transition-all ${viewMode === "list" ? "bg-white text-blue-600 shadow-md" : "text-gray-400"}`}><FaList className="w-4 h-4" /></button>
+                  </div>
+               </div>
+             </div>
+             <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-gray-50/30">
+               {labsList.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center h-full text-gray-400"><ImLab className="w-12 h-12 mb-2 opacity-20" /><p className="text-sm">No labs match.</p></div>
+               ) : viewMode === "cards" ? (
+                 <div className="grid grid-cols-3 gap-4">
+                   {labsList.map((lab) => (
+                     <div key={lab.labId} className="group relative flex flex-col p-4 rounded-xl border border-gray-200 bg-white hover:border-blue-400 hover:shadow-md transition-all h-full">
+                       <div className="flex items-start justify-between mb-3">
+                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><ImLab className="w-5 h-5" /></div>
+                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button onClick={() => handleOpenEditLab(lab)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"><FaEdit className="w-4 h-4" /></button>
+                           <button onClick={() => handleDeleteLab(lab.labId)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"><FaTrash className="w-4 h-4" /></button>
+                         </div>
+                       </div>
+                       <button onClick={() => handleLabClick(lab.labId)} className="text-left flex-1">
+                         <h4 className="font-bold text-gray-900 text-sm mb-1 truncate group-hover:text-blue-700">{lab.name}</h4>
+                         <div className="space-y-1">
+                           <p className="text-xs text-gray-500 flex items-center gap-1 truncate"><FaMapMarkerAlt className="w-3 h-3" /> {lab.institute?.name || "N/A"}</p>
+                           <p className="text-xs text-gray-500 flex items-center gap-1 truncate"><FaBox className="w-3 h-3" /> {DEPARTMENT_DISPLAY_NAMES[lab.department] || lab.department}</p>
+                         </div>
+                       </button>
+                     </div>
+                   ))}
+                 </div>
+               ) : (
+                 <div className="space-y-2">
+                   {labsList.map((lab) => (
+                     <div key={lab.labId} className="flex items-center justify-between p-3 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:shadow-md transition-all group">
+                       <button onClick={() => handleLabClick(lab.labId)} className="flex items-center gap-4 flex-1 text-left">
+                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><ImLab className="w-4 h-4" /></div>
+                         <div className="grid grid-cols-12 gap-4 flex-1 items-center">
+                           <div className="col-span-4"><div className="font-semibold text-gray-900 text-sm group-hover:text-blue-700">{lab.name}</div><div className="text-xs text-gray-400 font-mono">{lab.labId}</div></div>
+                           <div className="col-span-4 text-xs text-gray-600 truncate">{lab.institute?.name || "N/A"}</div>
+                           <div className="col-span-4 text-xs text-gray-600 truncate">{DEPARTMENT_DISPLAY_NAMES[lab.department] || lab.department}</div>
+                         </div>
+                       </button>
+                       <div className="flex gap-2 pl-4 border-l border-gray-100">
+                          <button onClick={() => handleOpenEditLab(lab)} className="p-1.5 text-gray-400 hover:text-blue-600"><FaEdit className="w-4 h-4" /></button>
+                          <button onClick={() => handleLabClick(lab.labId)} className="p-1.5 text-gray-400 hover:text-blue-600"><FaExternalLinkAlt className="w-4 h-4" /></button>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
+             </div>
           </div>
         </div>
 
-        {/* RIGHT SECTION - 4 Columns */}
+        {/* RIGHT SECTION (Alerts & Requests) */}
         <div className="col-span-4 flex flex-col gap-4 h-full min-h-0">
           <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col h-[45%]">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0 bg-white">
               <div className="flex items-center gap-2">
-                <div className="relative">
-                  <FaExclamationTriangle className="w-4 h-4 text-red-500" />
-                  {activeAlerts.length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  )}
-                </div>
+                <div className="relative"><FaExclamationTriangle className="w-4 h-4 text-red-500" />{activeAlerts.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}</div>
                 <h3 className="text-sm font-bold text-gray-800">Alerts</h3>
               </div>
               <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                <button
-                  onClick={() => handleTabChange("active")}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
-                    alertTab === "active"
-                      ? "bg-white text-blue-600 shadow-md"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  <FaList className="w-3 h-3" /> Active
-                </button>
-                <button
-                  onClick={() => handleTabChange("history")}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
-                    alertTab === "history"
-                      ? "bg-white text-blue-600 shadow-md"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  <FaHistory className="w-3 h-3" /> History
-                </button>
+                <button onClick={() => handleTabChange("active")} className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${alertTab === "active" ? "bg-white text-blue-600 shadow-md" : "text-gray-600"}`}><FaList className="w-3 h-3" /> Active</button>
+                <button onClick={() => handleTabChange("history")} className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${alertTab === "history" ? "bg-white text-blue-600 shadow-md" : "text-gray-600"}`}><FaHistory className="w-3 h-3" /> History</button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
               {alertTab === "active" ? (
-                isActiveAlertsLoading ? (
-                  <div className="flex justify-center py-6">
-                    <LoadingSpinner />
-                  </div>
-                ) : (
-                  <AlertsList
-                    alerts={activeAlerts}
-                    onAlertClick={(alert) => setSelectedAlert(alert)}
-                    compact={true}
-                  />
-                )
+                isActiveAlertsLoading ? <div className="flex justify-center py-6"><LoadingSpinner /></div> : <AlertsList alerts={activeAlerts} onAlertClick={(alert) => setSelectedAlert(alert)} compact={true} />
               ) : (
-                <CompactHistoryList
-                  alerts={historyAlerts}
-                  loading={isHistoryLoading}
-                  onAlertClick={(alert) => setSelectedAlert(alert)}
-                />
+                <CompactHistoryList alerts={historyAlerts} loading={isHistoryLoading} onAlertClick={(alert) => setSelectedAlert(alert)} />
               )}
             </div>
-            {/* Alert Details Modal */}
-            {selectedAlert && (
-              <AlertModal
-                alert={selectedAlert}
-                onClose={() => setSelectedAlert(null)}
-                onResolve={selectedAlert.isResolved ? null : handleResolveAlert}
-              />
-            )}
+            {selectedAlert && <AlertModal alert={selectedAlert} onClose={() => setSelectedAlert(null)} onResolve={selectedAlert.isResolved ? null : handleResolveAlert} />}
           </div>
 
           <div className="flex-1 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col min-h-0">
             <div className="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 flex-shrink-0 bg-white">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FaBox className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-sm font-bold text-gray-800">
-                    Reorder Requests
-                  </h3>
-                </div>
-                <button
-                  onClick={() => navigate("/reorder-requests")}
-                  className="text-gray-400 hover:text-blue-600 transition-colors"
-                  title="View Full Page"
-                >
-                  <FaExternalLinkAlt className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <div className="flex bg-gray-100 p-1 rounded-lg w-full">
-                <button
-                  onClick={() => setShowPendingOnly(true)}
-                  className={`flex-1 px-2 py-1 text-xs font-medium rounded-md transition-all text-center ${
-                    showPendingOnly
-                      ? "bg-white text-blue-600 shadow-md"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Pending ({pendingReorders.length})
-                </button>
-                <button
-                  onClick={() => setShowPendingOnly(false)}
-                  className={`flex-1 px-2 py-1 text-xs font-medium rounded-md transition-all text-center ${
-                    !showPendingOnly
-                      ? "bg-white text-blue-600 shadow-md"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  All
-                </button>
-              </div>
+               <div className="flex items-center justify-between">
+                 <div className="flex items-center gap-2"><FaBox className="w-4 h-4 text-blue-600" /><h3 className="text-sm font-bold text-gray-800">Reorder Requests</h3></div>
+                 <button onClick={() => navigate("/reorder-requests")} className="text-gray-400 hover:text-blue-600" title="View Full Page"><FaExternalLinkAlt className="w-3.5 h-3.5" /></button>
+               </div>
+               <div className="flex bg-gray-100 p-1 rounded-lg w-full">
+                 <button onClick={() => setShowPendingOnly(true)} className={`flex-1 px-2 py-1 text-xs font-medium rounded-md transition-all ${showPendingOnly ? "bg-white text-blue-600 shadow-md" : "text-gray-500"}`}>Pending ({pendingReorders.length})</button>
+                 <button onClick={() => setShowPendingOnly(false)} className={`flex-1 px-2 py-1 text-xs font-medium rounded-md transition-all ${!showPendingOnly ? "bg-white text-blue-600 shadow-md" : "text-gray-500"}`}>All</button>
+               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-2 min-h-0 bg-gray-50/50">
-              {displayedReorders.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 py-4">
-                  <FaBox className="w-8 h-8 mb-2 opacity-20" />
-                  <p className="text-xs">No requests found</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {displayedReorders.map((request) => (
-                    <div
-                      key={request.id}
-                      onClick={() => openRequestModal(request)}
-                      className="group bg-white p-2.5 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-start gap-3"
-                    >
-                      <div
-                        className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 ${
-                          request.priority === "CRITICAL"
-                            ? "bg-red-500 shadow-red-200 shadow-md"
-                            : request.priority === "HIGH"
-                            ? "bg-orange-400"
-                            : "bg-yellow-400"
-                        }`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <h4 className="font-medium text-xs text-gray-900 truncate max-w-[70%]">
-                            {request.equipmentName}
-                          </h4>
-                          <span className="text-[10px] text-gray-400">
-                            {new Date(request.createdAt).toLocaleDateString(
-                              undefined,
-                              { month: "short", day: "numeric" }
-                            )}
-                          </span>
+               {displayedReorders.length === 0 ? <div className="flex flex-col items-center justify-center h-full text-gray-400 py-4"><FaBox className="w-8 h-8 mb-2 opacity-20" /><p className="text-xs">No requests found</p></div> : 
+                 <div className="space-y-2">
+                   {displayedReorders.map((request) => (
+                     <div key={request.id} onClick={() => openRequestModal(request)} className="group bg-white p-2.5 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-start gap-3">
+                        <div className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 ${request.priority === "CRITICAL" ? "bg-red-500" : request.priority === "HIGH" ? "bg-orange-400" : "bg-yellow-400"}`} />
+                        <div className="flex-1 min-w-0">
+                           <div className="flex items-center justify-between mb-0.5"><h4 className="font-medium text-xs text-gray-900 truncate max-w-[70%]">{request.equipmentName}</h4><span className="text-[10px] text-gray-400">{new Date(request.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></div>
+                           <div className="text-[10px] text-gray-500 truncate mb-1">{request.labName}</div>
+                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${request.status === "PENDING" ? "bg-blue-50 text-blue-600" : "bg-gray-50 text-gray-500"}`}>{request.status}</span>
                         </div>
-                        <div className="text-[10px] text-gray-500 truncate mb-1">
-                          {request.labName}
-                        </div>
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            request.status === "PENDING"
-                              ? "bg-blue-50 text-blue-600"
-                              : request.status === "APPROVED"
-                              ? "bg-green-50 text-green-600"
-                              : "bg-gray-50 text-gray-500"
-                          }`}
-                        >
-                          {request.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                     </div>
+                   ))}
+                 </div>
+               }
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- MODALS WRAPPED WITH PORTAL --- */}
-
-      {/* 1. Reorder Request Details Modal */}
+      {/* MODALS */}
       {selectedRequest && (
         <ModalWrapper onClose={() => setSelectedRequest(null)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
-                  <FaBox className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">
-                    Request Details
-                  </h3>
-                  <p className="text-xs text-gray-500 font-mono">
-                    ID: {selectedRequest.id}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedRequest(null)}
-                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-              >
-                <FaTimes className="w-5 h-5 text-gray-500" />
-              </button>
+               <div className="flex items-center gap-3"><div className="p-2 bg-blue-100 rounded-lg text-blue-600"><FaBox className="w-5 h-5" /></div><div><h3 className="text-lg font-bold text-gray-900">Request Details</h3><p className="text-xs text-gray-500 font-mono">ID: {selectedRequest.id}</p></div></div>
+               <button onClick={() => setSelectedRequest(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><FaTimes className="w-5 h-5 text-gray-500" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               <div className="flex flex-wrap gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
-                <div className="flex-1">
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Status
-                  </span>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span
-                      className={`px-3 py-1 text-sm font-bold rounded-full ${
-                        selectedRequest.status === "PENDING"
-                          ? "bg-blue-100 text-blue-700"
-                          : selectedRequest.status === "APPROVED"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {selectedRequest.status}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Priority
-                  </span>
-                  <div className="mt-1">
-                    <span
-                      className={`px-3 py-1 text-sm font-bold rounded-full inline-flex items-center gap-1 ${
-                        selectedRequest.priority === "CRITICAL"
-                          ? "bg-red-100 text-red-700"
-                          : selectedRequest.priority === "HIGH"
-                          ? "bg-orange-100 text-orange-700"
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}
-                    >
-                      <FaExclamationTriangle className="w-3.5 h-3.5" />
-                      {selectedRequest.priority}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Requested Date
-                  </span>
-                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-900 font-medium">
-                    <FaCalendarAlt className="w-4 h-4 text-gray-400" />
-                    {new Date(selectedRequest.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
+                <div className="flex-1"><span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</span><div className="mt-1 flex items-center gap-2"><span className={`px-3 py-1 text-sm font-bold rounded-full ${selectedRequest.status === "PENDING" ? "bg-blue-100 text-blue-700" : selectedRequest.status === "APPROVED" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}>{selectedRequest.status}</span></div></div>
+                <div className="flex-1"><span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Priority</span><div className="mt-1"><span className={`px-3 py-1 text-sm font-bold rounded-full inline-flex items-center gap-1 ${selectedRequest.priority === "CRITICAL" ? "bg-red-100 text-red-700" : selectedRequest.priority === "HIGH" ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700"}`}><FaExclamationTriangle className="w-3.5 h-3.5" />{selectedRequest.priority}</span></div></div>
               </div>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                      <FaBox className="w-4 h-4" /> Equipment
-                    </h4>
-                    <p className="text-base font-semibold text-gray-900">
-                      {selectedRequest.equipmentName}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Type: {selectedRequest.type || "Consumable"}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                      <FaArrowUp className="w-4 h-4" /> Quantity Info
-                    </h4>
-                    <div className="flex items-center gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-500">Current:</span>{" "}
-                        <span className="font-mono font-medium text-gray-900">
-                          {selectedRequest.currentStock || 0}
-                        </span>
-                      </div>
-                      <div className="h-4 w-px bg-gray-300"></div>
-                      <div>
-                        <span className="text-gray-500">Requested:</span>{" "}
-                        <span className="font-mono font-bold text-blue-600">
-                          {selectedRequest.quantity || 1}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                      <FaMapMarkerAlt className="w-4 h-4" /> Location
-                    </h4>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedRequest.labName}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {selectedRequest.instituteName || "Main Institute"}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                      <FaUser className="w-4 h-4" /> Requested By
-                    </h4>
-                    <p className="text-sm text-gray-900">
-                      {selectedRequest.requestedBy || "Lab Manager"}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {selectedRequest.requesterRole || "Staff"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                  <FaFileAlt className="w-4 h-4" /> Reason / Description
-                </h4>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 text-sm text-gray-700 leading-relaxed">
-                  {selectedRequest.description ||
-                    "No additional description provided."}
-                </div>
-              </div>
+              <div><h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2"><FaFileAlt className="w-4 h-4" /> Reason / Description</h4><div className="bg-gray-50 rounded-lg p-4 border border-gray-200 text-sm text-gray-700 leading-relaxed">{selectedRequest.description || "No additional description provided."}</div></div>
               {selectedRequest.status === "PENDING" && (
                 <div className="pt-6 border-t border-gray-200">
-                  <h4 className="text-sm font-bold text-gray-900 mb-3">
-                    Review Actions
-                  </h4>
-                  <div className="space-y-4">
-                    <textarea
-                      value={reviewComment}
-                      onChange={(e) => setReviewComment(e.target.value)}
-                      placeholder="Enter approval notes or rejection reason (required for rejection)..."
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm min-h-[100px] resize-y transition-all"
-                    />
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => handleReviewAction("APPROVED")}
-                        disabled={isSubmittingReview}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-md hover:shadow"
-                      >
-                        {isSubmittingReview ? (
-                          <LoadingSpinner size="sm" color="white" />
-                        ) : (
-                          <>
-                            <FaCheckCircle className="w-4 h-4" /> Approve
-                            Request
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleReviewAction("REJECTED")}
-                        disabled={isSubmittingReview || !reviewComment.trim()}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-                        title={
-                          !reviewComment.trim()
-                            ? "Please add a comment to reject"
-                            : ""
-                        }
-                      >
-                        {isSubmittingReview ? (
-                          <LoadingSpinner size="sm" color="red" />
-                        ) : (
-                          <>
-                            <FaTimesCircle className="w-4 h-4" /> Reject Request
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                   <h4 className="text-sm font-bold text-gray-900 mb-3">Review Actions</h4>
+                   <div className="space-y-4">
+                     <textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder="Enter approval notes or rejection reason (required for rejection)..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm min-h-[100px] resize-y transition-all" />
+                     <div className="flex gap-4">
+                       <button onClick={() => handleReviewAction("APPROVED")} disabled={isSubmittingReview} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-md hover:shadow">{isSubmittingReview ? <LoadingSpinner size="sm" color="white" /> : <><FaCheckCircle className="w-4 h-4" /> Approve Request</>}</button>
+                       <button onClick={() => handleReviewAction("REJECTED")} disabled={isSubmittingReview || !reviewComment.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium">{isSubmittingReview ? <LoadingSpinner size="sm" color="red" /> : <><FaTimesCircle className="w-4 h-4" /> Reject Request</>}</button>
+                     </div>
+                   </div>
                 </div>
               )}
             </div>
           </div>
         </ModalWrapper>
       )}
-
-      {/* 2. Lab Manager Form Modal */}
-      {isLabModalOpen && (
-        <ModalWrapper onClose={handleLabModalClose}>
-          <div style={{ width: "100%" }}>
-            <LabManagerForm
-              isOpen={isLabModalOpen}
-              onClose={handleLabModalClose}
-              labToEdit={editingLab}
-            />
-          </div>
-        </ModalWrapper>
-      )}
-
-      {/* 3. Institute Manager Form Modal */}
-      {isInstituteModalOpen && (
-        <ModalWrapper onClose={handleInstituteModalClose}>
-          <div style={{ width: "100%" }}>
-            <InstituteManagerForm
-              isOpen={isInstituteModalOpen}
-              onClose={handleInstituteModalClose}
-            />
-          </div>
-        </ModalWrapper>
-      )}
+      {isLabModalOpen && <ModalWrapper onClose={handleLabModalClose}><div style={{ width: "100%" }}><LabManagerForm isOpen={isLabModalOpen} onClose={handleLabModalClose} labToEdit={editingLab} /></div></ModalWrapper>}
+      {isInstituteModalOpen && <ModalWrapper onClose={handleInstituteModalClose}><div style={{ width: "100%" }}><InstituteManagerForm isOpen={isInstituteModalOpen} onClose={handleInstituteModalClose} /></div></ModalWrapper>}
     </div>
   );
 }

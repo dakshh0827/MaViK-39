@@ -1,4 +1,4 @@
-// backend/services/firebase.service.js - UPDATED WITH FAULT DETECTION
+// backend/services/firebase.service.js - UPDATED WITH REAL-TIME HEALTH/EFFICIENCY CALCULATION
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue } from "firebase/database";
 import prisma from "../config/database.js";
@@ -22,17 +22,57 @@ const db = getDatabase(app);
 // FAULT DETECTION THRESHOLDS
 const FAULT_THRESHOLDS = {
   temperature: {
-    critical: 85,    // Above this = CRITICAL fault
-    warning: 75,     // Above this = WARNING
+    critical: 85,
+    warning: 75,
   },
   vibration: {
-    critical: 8,     // Above this = CRITICAL fault
-    warning: 6,      // Above this = WARNING
+    critical: 8,
+    warning: 6,
   },
   energyConsumption: {
-    critical: 450,   // Above this = CRITICAL fault
-    warning: 400,    // Above this = WARNING
+    critical: 450,
+    warning: 400,
   }
+};
+
+// ========================================
+// 🆕 REAL-TIME HEALTH & EFFICIENCY CALCULATION
+// ========================================
+const calculateMetrics = (temp, vib, energy) => {
+  const t = temp || 0;
+  const v = vib || 0;
+  const e = energy || 0;
+
+  // --- Health Score Calculation (ADJUSTED) ---
+  // Baseline: 100
+  // ADJUSTED Penalties (less severe):
+  // - Temperature: -0.8 points per degree above 60°C (was 50°C at -1.5)
+  // - Vibration: -3 points per mm/s (was -5)
+  // - Energy: -0.03 points per W above 550W (was 500W at -0.05)
+  let healthPenalties = 0;
+  
+  if (t > 60) healthPenalties += (t - 60) * 0.8;  // Less severe, higher threshold
+  healthPenalties += v * 3;  // Reduced from 5 to 3
+  if (e > 550) healthPenalties += (e - 550) * 0.03;  // Higher threshold, less penalty
+
+  const healthScore = Math.max(0, Math.min(100, 100 - healthPenalties));
+
+  // --- Efficiency Calculation (ADJUSTED) ---
+  // Baseline: 100
+  // ADJUSTED Penalties (less severe):
+  // - Vibration: -4 points per mm/s (was -8)
+  // - Temperature: -1 point per degree above 70°C (was 60°C at -2)
+  let efficiencyPenalties = 0;
+  
+  efficiencyPenalties += v * 4;  // Reduced from 8 to 4
+  if (t > 70) efficiencyPenalties += (t - 70) * 1;  // Higher threshold, less penalty
+
+  const efficiency = Math.max(0, Math.min(100, 100 - efficiencyPenalties));
+
+  return { 
+    healthScore: parseFloat(healthScore.toFixed(1)), 
+    efficiency: parseFloat(efficiency.toFixed(1)) 
+  };
 };
 
 // Helper: Check if equipment is faulty
@@ -150,6 +190,19 @@ class FirebaseService {
          energyConsumption = 150 + (temperature * 3);
       }
 
+      // ========================================
+      // 🆕 CALCULATE HEALTH & EFFICIENCY IN REAL-TIME
+      // ========================================
+      const { healthScore, efficiency } = calculateMetrics(temperature, vibration, energyConsumption);
+      
+      logger.info(`📊 Real-time metrics calculated for ${equipmentId}:`, {
+        temperature,
+        vibration,
+        energyConsumption,
+        healthScore,
+        efficiency
+      });
+
       // 🚨 FAULT DETECTION
       const faultCheck = detectFault(temperature, vibration, energyConsumption);
       
@@ -191,15 +244,18 @@ class FirebaseService {
         }
       });
 
-      // 3. Update EquipmentStatus
+      // ========================================
+      // 🆕 UPDATE STATUS WITH CALCULATED METRICS
+      // ========================================
       const updatedStatus = await prisma.equipmentStatus.update({
         where: { equipmentId },
         data: {
           temperature,
           vibration,
           energyConsumption,
+          healthScore, // 🆕 Real-time calculated health score
           lastUsedAt: new Date(),
-          status: newStatus, // Update status based on fault detection
+          status: newStatus,
         },
         include: {
           equipment: {
@@ -222,36 +278,43 @@ class FirebaseService {
         }
       });
 
-      logger.info(`✅ EquipmentStatus updated for equipment ${equipmentId} - Status: ${newStatus}`);
+      logger.info(`✅ EquipmentStatus updated for equipment ${equipmentId} - Status: ${newStatus}, Health: ${healthScore}%`);
 
-      // 4. Update DepartmentAnalytics
+      // ========================================
+      // 🆕 UPDATE ANALYTICS WITH CALCULATED EFFICIENCY
+      // ========================================
       await prisma.departmentAnalytics.updateMany({
         where: { equipmentId },
         data: {
           temperature,
           vibration,
           energyConsumption,
+          efficiency, // 🆕 Real-time calculated efficiency
         }
       });
 
-      logger.info(`✅ Analytics updated for equipment ${equipmentId}`);
+      logger.info(`✅ Analytics updated for equipment ${equipmentId} - Efficiency: ${efficiency}%`);
 
       // 5. 🚨 CREATE ALERT IF FAULT DETECTED (and wasn't previously faulty)
       if (isNowFaulty && !wasPreviouslyFaulty) {
         await this.createFaultAlert(updatedStatus.equipment, faultCheck);
       }
 
-      // 6. 📡 BROADCAST VIA SOCKET.IO
+      // ========================================
+      // 🆕 BROADCAST WITH CALCULATED METRICS VIA SOCKET.IO
+      // ========================================
       broadcastEquipmentStatus(equipmentId, {
         ...updatedStatus,
         temperature,
         vibration,
         energyConsumption,
+        healthScore, // 🆕 Include calculated health score
+        efficiency,  // 🆕 Include calculated efficiency
         firebaseDeviceId,
         updatedAt: new Date(),
       });
 
-      logger.info(`📡 Socket.IO broadcast sent for equipment ${equipmentId}`);
+      logger.info(`📡 Socket.IO broadcast sent for equipment ${equipmentId} with real-time metrics`);
       logger.info(`🎉 Successfully processed reading from ${firebaseDeviceId}`);
 
     } catch (error) {
@@ -262,12 +325,11 @@ class FirebaseService {
     }
   }
 
-  // 🚨 NEW: Create Fault Alert
+  // 🚨 Create Fault Alert
   async createFaultAlert(equipment, faultCheck) {
     try {
       logger.info(`🚨 Creating fault alert for equipment ${equipment.equipmentId}`);
 
-      // Find users to notify (Policy Makers, Lab Managers in same institute, Trainers in same lab)
       const usersToNotify = await prisma.user.findMany({
         where: {
           isActive: true,
@@ -289,7 +351,6 @@ class FirebaseService {
 
       const userIds = usersToNotify.map((u) => u.id);
 
-      // Create alert
       const alert = await prisma.alert.create({
         data: {
           equipmentId: equipment.id,
@@ -326,7 +387,6 @@ class FirebaseService {
         },
       });
 
-      // Broadcast alert via Socket.IO
       broadcastAlert(alert);
 
       logger.info(`✅ Fault alert created and broadcast for equipment ${equipment.equipmentId}`);
@@ -359,7 +419,7 @@ class FirebaseService {
       await this.startListening(eq.firebaseDeviceId, eq.id);
     }
 
-    logger.info(`✅ Started ${equipment.length} Firebase listeners`);
+    logger.info(`✅ Started ${equipment.length} Firebase listeners with real-time metric calculations`);
   }
 
   stopAllListeners() {

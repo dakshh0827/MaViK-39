@@ -30,19 +30,16 @@ export const useChatbotStore = create((set, get) => ({
     set({ isLoading: true });
 
     try {
-      // Try to fetch history from n8n
       const response = await fetch(`${WEBHOOK_URL}/history?sessionId=${sessionId}`);
       
       if (response.ok) {
         const data = await response.json();
-        // UI format: [{ message: "User msg", response: "Bot response" }]
         
         const uiMessages = [];
         let currentPair = {};
 
         if (Array.isArray(data)) {
             data.forEach(msg => {
-                // Adjust based on how your specific n8n workflow returns roles
                 if (msg.role === 'user' || msg.type === 'human') {
                     if (currentPair.message) uiMessages.push(currentPair); 
                     currentPair = { message: msg.text || msg.content };
@@ -122,6 +119,41 @@ export const useChatbotStore = create((set, get) => ({
           ),
         isLoading: false,
       }));
+    }
+  },
+
+  // NEW: Generate a briefing without affecting the main chat history
+  generateBriefing: async (prompt) => {
+    // We use the same sessionId to maintain context if needed, or you could generate a temp one.
+    const { sessionId } = get();
+    
+    try {
+      const response = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          action: "sendMessage",
+          chatInput: prompt,
+          sessionId: sessionId 
+        }),
+      });
+
+      const data = await response.json();
+      
+      let botResponse = "No data available for this equipment.";
+      if (data && typeof data === 'object') {
+          if (data.output) botResponse = data.output;
+          else if (data.text) botResponse = data.text;
+          else if (Array.isArray(data) && data[0]?.output) botResponse = data[0].output;
+          else if (data.data) botResponse = data.data; 
+      }
+      return botResponse;
+    } catch (error) {
+      console.error("Briefing error:", error);
+      throw new Error("Failed to fetch briefing data");
     }
   },
   
