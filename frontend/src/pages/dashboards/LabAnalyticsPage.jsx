@@ -1,4 +1,4 @@
-// frontend/src/pages/dashboards/LabAnalyticsPage.jsx
+// frontend/src/pages/dashboards/LabAnalyticsPage.jsx - UPDATED WITH REAL-TIME HEALTH/EFFICIENCY
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
@@ -28,30 +28,6 @@ const STATUS_COLORS = {
 
 const FALLBACK_COLORS = ["#8B5CF6", "#EC4899", "#14B8A6", "#6366F1", "#84CC16", "#06B6D4"];
 
-// --- HELPER FUNCTIONS ---
-
-// 1. Metric Calculation Helper (Added from first file)
-const calculateMetrics = (temp, vib, energy) => {
-  const t = temp || 0;
-  const v = vib || 0;
-  const e = energy || 0;
-
-  // Health Score Calculation
-  let healthPenalties = 0;
-  if (t > 50) healthPenalties += (t - 50) * 1.5;
-  healthPenalties += v * 5; 
-  if (e > 500) healthPenalties += (e - 500) * 0.05;
-  const healthScore = Math.max(0, Math.min(100, 100 - healthPenalties));
-
-  // Efficiency Calculation
-  let efficiencyPenalties = 0;
-  efficiencyPenalties += v * 8;
-  if (t > 60) efficiencyPenalties += (t - 60) * 2;
-  const efficiency = Math.max(0, Math.min(100, 100 - efficiencyPenalties));
-
-  return { healthScore, efficiency };
-};
-
 const getISOStandard = (department) => {
   if (!department) return null;
   const dept = department.toLowerCase();
@@ -62,8 +38,6 @@ const getISOStandard = (department) => {
   if (dept.includes("auto")) return "ISO 16750, ISO 26262";
   return null;
 };
-
-// --- SUB-COMPONENTS ---
 
 const PredictiveMaintenanceCard = ({ equipment, prediction }) => {
   if (!prediction) return null;
@@ -120,22 +94,19 @@ export default function LabAnalyticsPage() {
   const { labId } = useParams();
   const navigate = useNavigate();
 
-  // --- STATE ---
   const [labData, setLabData] = useState(null);
   const [predictiveData, setPredictiveData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Socket State
   const [socket, setSocket] = useState(null);
   const [liveUpdates, setLiveUpdates] = useState({});
   const [isSocketConnected, setIsSocketConnected] = useState(false);
 
-  // --- SOCKET.IO CONNECTION (ROBUST VERSION) ---
+  // --- SOCKET.IO CONNECTION ---
   useEffect(() => {
     console.log('🔌 Setting up Socket.IO connection...');
 
-    // 1. Robust Token Retrieval
     let token = null;
     try {
       const authStorage = localStorage.getItem('auth-storage');
@@ -152,11 +123,9 @@ export default function LabAnalyticsPage() {
       return;
     }
 
-    // 2. URL Config
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     const socketUrl = apiUrl.replace('/api', '');
     
-    // 3. Initialize Socket
     const socketInstance = io(socketUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
@@ -165,7 +134,6 @@ export default function LabAnalyticsPage() {
       reconnectionDelay: 1000,
     });
 
-    // 4. Connection Handlers
     socketInstance.on('connect', () => {
       console.log('✅ Socket.IO connected!', socketInstance.id);
       setIsSocketConnected(true);
@@ -181,13 +149,11 @@ export default function LabAnalyticsPage() {
       setIsSocketConnected(false);
     });
 
-    // 5. Data Event Listeners (Handling both event types)
     socketInstance.on('equipment:status', (data) => {
       handleEquipmentUpdate(data);
     });
 
     socketInstance.on('equipment:status:update', (data) => {
-      // This event might send { equipmentId, status: { ... } } or flattened
       handleEquipmentUpdate(data.status || data);
     });
 
@@ -200,14 +166,25 @@ export default function LabAnalyticsPage() {
     };
   }, []);
 
-  // --- HANDLE LIVE UPDATES (UPDATED LOGIC) ---
+  // ========================================
+  // 🆕 HANDLE LIVE UPDATES WITH REAL-TIME HEALTH/EFFICIENCY
+  // ========================================
   const handleEquipmentUpdate = (data) => {
-    const equipmentId = data.equipmentId || data.id; // Handle varied payload structures
+    const equipmentId = data.equipmentId || data.id;
     
     if (!equipmentId) {
       console.warn('⚠️ No equipmentId in update data', data);
       return;
     }
+
+    console.log('📊 Real-time update received:', {
+      equipmentId,
+      temperature: data.temperature,
+      vibration: data.vibration,
+      energyConsumption: data.energyConsumption,
+      healthScore: data.healthScore, // 🆕 Real-time calculated
+      efficiency: data.efficiency,    // 🆕 Real-time calculated
+    });
 
     // 1. Update Live Indicator State
     setLiveUpdates((prev) => ({
@@ -216,59 +193,61 @@ export default function LabAnalyticsPage() {
         temperature: data.temperature,
         vibration: data.vibration,
         energyConsumption: data.energyConsumption,
+        healthScore: data.healthScore,     // 🆕 Store real-time health score
+        efficiency: data.efficiency,       // 🆕 Store real-time efficiency
         updatedAt: new Date(),
       },
     }));
 
-    // 2. Update Lab Data & Recalculate Stats LOCALLY
+    // ========================================
+    // 🆕 UPDATE LAB DATA WITH REAL-TIME CALCULATED METRICS
+    // ========================================
     setLabData((prevLabData) => {
       if (!prevLabData || !prevLabData.equipment) return prevLabData;
 
       let updatedEquipmentList = prevLabData.equipment.map((eq) => {
         if (eq.id === equipmentId) {
-          
-          // Merge sensor values (New Data > Existing Params > 0)
-          const newTemp = data.temperature ?? eq.analyticsParams?.temperature ?? 0;
-          const newVib = data.vibration ?? eq.analyticsParams?.vibration ?? 0;
-          const newEnergy = data.energyConsumption ?? eq.analyticsParams?.energyConsumption ?? 0;
+          // Use the calculated metrics from the backend
+          const newHealthScore = data.healthScore ?? eq.status?.healthScore ?? 0;
+          const newEfficiency = data.efficiency ?? eq.analyticsParams?.efficiency ?? 0;
 
-          // CALCULATE METRICS LOCALLY
-          const { healthScore, efficiency } = calculateMetrics(newTemp, newVib, newEnergy);
-
-          // Return merged object with calculated derived values
           return {
             ...eq,
             status: {
               ...eq.status,
               status: data.status || eq.status?.status,
-              healthScore: healthScore, // Updated via calculation
-              // Update status sensor values for redundancy
-              temperature: newTemp,
-              vibration: newVib,
-              energyConsumption: newEnergy,
+              healthScore: newHealthScore, // 🆕 Use real-time calculated value
+              temperature: data.temperature ?? eq.status?.temperature,
+              vibration: data.vibration ?? eq.status?.vibration,
+              energyConsumption: data.energyConsumption ?? eq.status?.energyConsumption,
             },
             analyticsParams: {
               ...eq.analyticsParams,
-              temperature: newTemp,
-              vibration: newVib,
-              energyConsumption: newEnergy,
-              efficiency: efficiency, // Updated via calculation
+              temperature: data.temperature ?? eq.analyticsParams?.temperature,
+              vibration: data.vibration ?? eq.analyticsParams?.vibration,
+              energyConsumption: data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
+              efficiency: newEfficiency, // 🆕 Use real-time calculated value
             }
           };
         }
         return eq;
       });
 
-      // Recalculate Global Stats based on new calculated values
+      // ========================================
+      // 🆕 RECALCULATE GLOBAL STATS BASED ON REAL-TIME DATA
+      // ========================================
       const totalEquipment = updatedEquipmentList.length;
-      const avgHealthScore = updatedEquipmentList.reduce((sum, eq) => sum + (eq.status?.healthScore || 0), 0) / (totalEquipment || 1);
+      const avgHealthScore = updatedEquipmentList.reduce((sum, eq) => 
+        sum + (eq.status?.healthScore || 0), 0) / (totalEquipment || 1);
+
+      console.log('📊 Updated average health score:', avgHealthScore);
 
       return {
         ...prevLabData,
         equipment: updatedEquipmentList,
         statistics: {
           ...prevLabData.statistics,
-          avgHealthScore: avgHealthScore
+          avgHealthScore: avgHealthScore // 🆕 Update with real-time average
         }
       };
     });
@@ -285,7 +264,6 @@ export default function LabAnalyticsPage() {
         const analyticsResponse = await api.get(`/monitoring/lab-analytics/${labId}`);
         setLabData(analyticsResponse.data.data);
 
-        // Fetch predictive data separately if needed
         try {
           const predictiveResponse = await api.get(`/analytics/predictive/${labId}`);
           setPredictiveData(predictiveResponse.data.data || []);
@@ -330,7 +308,6 @@ export default function LabAnalyticsPage() {
 
     const equipment = labData.equipment;
 
-    // Status Distribution
     const statusData = equipment.reduce((acc, eq) => {
       let status = eq.status?.status || "OFFLINE";
       status = status.toUpperCase().replace(/_/g, " ");
@@ -344,15 +321,14 @@ export default function LabAnalyticsPage() {
       value: count,
     }));
 
-    // Health Score
+    // 🆕 Health Score uses real-time calculated values
     const healthScoreData = equipment.map((eq) => ({
       name: eq.name,
       shortName: eq.name.substring(0, 15) + (eq.name.length > 15 ? "..." : ""),
-      healthScore: eq.status?.healthScore || 0,
-      efficiency: eq.analyticsParams?.efficiency || 0,
+      healthScore: eq.status?.healthScore || 0, // Real-time value
+      efficiency: eq.analyticsParams?.efficiency || 0, // Real-time value
     }));
 
-    // Analytics Params
     const tempData = equipment.filter(eq => eq.analyticsParams?.temperature !== undefined).map(eq => ({
         name: eq.name,
         shortName: eq.name.substring(0, 10),
@@ -372,7 +348,7 @@ export default function LabAnalyticsPage() {
     }));
 
     return { statusChartData, healthScoreData, tempData, vibrationData, energyData };
-  }, [labData]); 
+  }, [labData]);
 
   // --- RENDER ---
   if (isLoading) return <div className="flex items-center justify-center min-h-screen bg-gray-50"><LoadingSpinner size="lg" /></div>;
@@ -405,7 +381,6 @@ export default function LabAnalyticsPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-gray-900">{labData.lab?.name || "Lab Analytics"}</h1>
-                {/* Connection Badge */}
                 {isSocketConnected ? (
                    <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-1.5 border border-green-200">
                     <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -434,16 +409,21 @@ export default function LabAnalyticsPage() {
       </div>
 
       <div className="flex-1 w-full p-6 space-y-6">
-        {/* Stats Cards */}
+        {/* Stats Cards - 🆕 Now shows real-time calculated average */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <StatCard icon={Box} title="Total Equipment" value={stats.totalEquipment || 0} />
-          <StatCard icon={ShieldCheck} title="Avg Health" value={`${(stats.avgHealthScore || 0).toFixed(0)}%`} color="text-green-600" />
+          <StatCard 
+            icon={ShieldCheck} 
+            title="Avg Health" 
+            value={`${(stats.avgHealthScore || 0).toFixed(0)}%`} 
+            color="text-green-600" 
+          />
           <StatCard icon={TrendingUp} title="Total Uptime" value={`${(stats.totalUptime || 0).toFixed(0)}h`} />
           <StatCard icon={TrendingDown} title="Downtime" value={`${(stats.totalDowntime || 0).toFixed(0)}h`} />
           <StatCard icon={Clock} title="Active Now" value={stats.inClassEquipment || 0} color="text-purple-600" />
         </div>
 
-        {/* Predictive Maintenance - Scrollable */}
+        {/* Predictive Maintenance */}
         {predictiveData && predictiveData.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
@@ -469,10 +449,9 @@ export default function LabAnalyticsPage() {
           </div>
         )}
 
-        {/* Charts Section */}
+        {/* Charts Section - 🆕 Now uses real-time health/efficiency data */}
         {chartData && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Pie Chart */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <PieChartIcon className="text-blue-500 w-5 h-5"/> Status
@@ -496,10 +475,10 @@ export default function LabAnalyticsPage() {
               </div>
             </div>
 
-            {/* Health Chart - Fixed Width, Dynamic Bars */}
+            {/* Health Chart - 🆕 Real-time calculated values */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2 flex flex-col">
               <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <BarChart3 className="text-green-500 w-5 h-5"/> Health & Efficiency
+                <BarChart3 className="text-green-500 w-5 h-5"/> Health & Efficiency (Real-time)
               </h3>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -547,11 +526,11 @@ export default function LabAnalyticsPage() {
           </div>
         )}
 
-        {/* Live Equipment Table */}
+        {/* Live Equipment Table - 🆕 Shows real-time health/efficiency */}
         {labData.equipment && labData.equipment.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">Equipment Detail View</h3>
+              <h3 className="font-bold text-gray-900">Equipment Detail View (Real-time Metrics)</h3>
               {Object.keys(liveUpdates).length > 0 && (
                 <span className="text-xs text-green-600 flex items-center gap-1 font-bold animate-pulse">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -566,6 +545,7 @@ export default function LabAnalyticsPage() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Equipment</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Health</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Efficiency</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Temp</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Vib</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Energy</th>
@@ -588,9 +568,15 @@ export default function LabAnalyticsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {(eq.status?.healthScore || 0).toFixed(0)}%
+                          <span className={hasLiveData ? 'font-bold text-green-700' : ''}>
+                            {(eq.status?.healthScore || 0).toFixed(0)}%
+                          </span>
                         </td>
-                        {/* Live Data Cells */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <span className={hasLiveData ? 'font-bold text-green-700' : ''}>
+                            {(eq.analyticsParams?.efficiency || 0).toFixed(0)}%
+                          </span>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                             <span className={hasLiveData ? 'font-bold text-green-700' : ''}>
                                 {eq.analyticsParams?.temperature?.toFixed(1) || "N/A"}
