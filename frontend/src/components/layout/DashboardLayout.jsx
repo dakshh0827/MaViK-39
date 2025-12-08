@@ -13,6 +13,7 @@ import {
   FaBuilding,
   FaDesktop,
   FaExclamationTriangle,
+  FaExternalLinkAlt, // Added icon for the external link
 } from "react-icons/fa";
 import { ImLab } from "react-icons/im";
 import { useState, useEffect, useRef } from "react";
@@ -108,34 +109,28 @@ export default function DashboardLayout() {
     }
 
     // --- CLEANUP FUNCTION ---
-    // This runs automatically when the user leaves the DashboardLayout (e.g., Logout)
     return () => {
-      // Remove Script and Styles
       document.getElementById("n8n-chat-script")?.remove();
       document.getElementById("n8n-chat-style")?.remove();
       document.getElementById("n8n-chat-custom-css")?.remove();
 
-      // Remove the actual Chat Widget from DOM
-      // The library usually attaches a div with class 'n8n-chat-widget' to body
       const widget = document.querySelector(".n8n-chat-widget");
       if (widget) {
         widget.remove();
       }
 
-      // Safety check: sometimes it creates a different container, remove that too if found
       const chatRoot = document.querySelector(".n8n-chat");
       if (chatRoot) {
         chatRoot.remove();
       }
     };
-  }, []); // Empty dependency array ensures this only runs on Mount/Unmount
+  }, []);
 
-  // 2. Visibility Toggle based on Route (Runs on every route change)
+  // 2. Visibility Toggle based on Route
   useEffect(() => {
     const styleId = "n8n-chat-toggle-style";
     let styleTag = document.getElementById(styleId);
 
-    // If we are on the dedicated Chatbot page, hide the floating widget
     if (location.pathname === "/chatbot") {
       if (!styleTag) {
         styleTag = document.createElement("style");
@@ -146,7 +141,6 @@ export default function DashboardLayout() {
         document.head.appendChild(styleTag);
       }
     } else {
-      // If we are elsewhere in the dashboard, ensure the widget is visible
       if (styleTag) {
         styleTag.remove();
       }
@@ -175,7 +169,6 @@ export default function DashboardLayout() {
   const handleLogout = () => {
     logout();
     navigate("/login");
-    // Note: The useEffect cleanup above will handle removing the chatbot
   };
 
   const navItems = [
@@ -402,6 +395,18 @@ export default function DashboardLayout() {
           <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
             {user?.role?.replace("_", " ")}
           </span>
+
+          {/* ADDED: NQR Portal Button */}
+          <a
+            href="https://nqr.gov.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-5 py-2.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+            title="National Qualification Register"
+          >
+            <span>NQR</span>
+          </a>
+
           <button
             onClick={handleLogout}
             className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
