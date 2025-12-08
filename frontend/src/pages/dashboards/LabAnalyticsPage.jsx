@@ -29,6 +29,29 @@ const STATUS_COLORS = {
 const FALLBACK_COLORS = ["#8B5CF6", "#EC4899", "#14B8A6", "#6366F1", "#84CC16", "#06B6D4"];
 
 // --- HELPER FUNCTIONS ---
+
+// 1. Metric Calculation Helper (Added from first file)
+const calculateMetrics = (temp, vib, energy) => {
+  const t = temp || 0;
+  const v = vib || 0;
+  const e = energy || 0;
+
+  // Health Score Calculation
+  let healthPenalties = 0;
+  if (t > 50) healthPenalties += (t - 50) * 1.5;
+  healthPenalties += v * 5; 
+  if (e > 500) healthPenalties += (e - 500) * 0.05;
+  const healthScore = Math.max(0, Math.min(100, 100 - healthPenalties));
+
+  // Efficiency Calculation
+  let efficiencyPenalties = 0;
+  efficiencyPenalties += v * 8;
+  if (t > 60) efficiencyPenalties += (t - 60) * 2;
+  const efficiency = Math.max(0, Math.min(100, 100 - efficiencyPenalties));
+
+  return { healthScore, efficiency };
+};
+
 const getISOStandard = (department) => {
   if (!department) return null;
   const dept = department.toLowerCase();
@@ -160,21 +183,12 @@ export default function LabAnalyticsPage() {
 
     // 5. Data Event Listeners (Handling both event types)
     socketInstance.on('equipment:status', (data) => {
-      console.log('📡 [equipment:status] Received update:', data);
       handleEquipmentUpdate(data);
     });
 
     socketInstance.on('equipment:status:update', (data) => {
-      console.log('📡 [equipment:status:update] Received update:', data);
       // This event might send { equipmentId, status: { ... } } or flattened
       handleEquipmentUpdate(data.status || data);
-    });
-
-    // Debug listener
-    socketInstance.onAny((eventName, ...args) => {
-      if (!eventName.includes('equipment')) {
-        console.log('📡 Socket event:', eventName);
-      }
     });
 
     setSocket(socketInstance);
@@ -186,7 +200,7 @@ export default function LabAnalyticsPage() {
     };
   }, []);
 
-  // --- HANDLE LIVE UPDATES ---
+  // --- HANDLE LIVE UPDATES (UPDATED LOGIC) ---
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id; // Handle varied payload structures
     
@@ -206,38 +220,46 @@ export default function LabAnalyticsPage() {
       },
     }));
 
-    // 2. Update Lab Data & Recalculate Stats
+    // 2. Update Lab Data & Recalculate Stats LOCALLY
     setLabData((prevLabData) => {
       if (!prevLabData || !prevLabData.equipment) return prevLabData;
 
       let updatedEquipmentList = prevLabData.equipment.map((eq) => {
         if (eq.id === equipmentId) {
-          // Merge new data into existing equipment object
+          
+          // Merge sensor values (New Data > Existing Params > 0)
+          const newTemp = data.temperature ?? eq.analyticsParams?.temperature ?? 0;
+          const newVib = data.vibration ?? eq.analyticsParams?.vibration ?? 0;
+          const newEnergy = data.energyConsumption ?? eq.analyticsParams?.energyConsumption ?? 0;
+
+          // CALCULATE METRICS LOCALLY
+          const { healthScore, efficiency } = calculateMetrics(newTemp, newVib, newEnergy);
+
+          // Return merged object with calculated derived values
           return {
             ...eq,
             status: {
               ...eq.status,
               status: data.status || eq.status?.status,
-              healthScore: data.healthScore !== undefined ? data.healthScore : eq.status?.healthScore,
-              // Update status sensor values if present
-              temperature: data.temperature ?? eq.status?.temperature,
-              vibration: data.vibration ?? eq.status?.vibration,
-              energyConsumption: data.energyConsumption ?? eq.status?.energyConsumption,
+              healthScore: healthScore, // Updated via calculation
+              // Update status sensor values for redundancy
+              temperature: newTemp,
+              vibration: newVib,
+              energyConsumption: newEnergy,
             },
             analyticsParams: {
               ...eq.analyticsParams,
-              // Update analytics sensor values
-              temperature: data.temperature ?? eq.analyticsParams?.temperature,
-              vibration: data.vibration ?? eq.analyticsParams?.vibration,
-              energyConsumption: data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
-              efficiency: data.efficiency ?? eq.analyticsParams?.efficiency,
+              temperature: newTemp,
+              vibration: newVib,
+              energyConsumption: newEnergy,
+              efficiency: efficiency, // Updated via calculation
             }
           };
         }
         return eq;
       });
 
-      // Recalculate Global Stats (e.g. Avg Health) for the top cards
+      // Recalculate Global Stats based on new calculated values
       const totalEquipment = updatedEquipmentList.length;
       const avgHealthScore = updatedEquipmentList.reduce((sum, eq) => sum + (eq.status?.healthScore || 0), 0) / (totalEquipment || 1);
 
@@ -370,7 +392,6 @@ export default function LabAnalyticsPage() {
 
   const isoStandard = getISOStandard(labData.lab?.department);
   const stats = labData.statistics || {};
-  const getChartWidth = (count) => Math.max(100, count * 60);
 
   return (
     <div className="min-h-screen bg-gray-200 flex flex-col">
