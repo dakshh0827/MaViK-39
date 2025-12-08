@@ -51,6 +51,19 @@ const ROOT_HEIGHT = 80;
 const CANVAS_PADDING = 50;
 const BUS_OFFSET = 60;
 
+ const STATUS_MAPPING = {
+    'Laser_Engraver_01': [
+      'CNC_Machine_01',      // Replace with actual equipment IDs
+      'Welding_Station_01',  // Replace with actual equipment IDs
+      '3D_Printer_01'        // Replace with actual equipment IDs
+    ]
+  };
+
+  const isMappedEquipment = (equipmentId) => {
+  if (equipmentId === 'Laser_Engraver_01') return true;
+  return STATUS_MAPPING['Laser_Engraver_01']?.includes(equipmentId) || false;
+};
+
 export default function SLDPage() {
   const { user, isLoading: authLoading } = useAuthStore();
   const { labs, fetchLabs, isLoading: labsLoading } = useLabStore();
@@ -175,17 +188,34 @@ export default function SLDPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleEquipmentUpdate = (data) => {
+ const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
     if (!equipmentId) return;
 
-    setLiveEquipmentData((prev) => ({
-      ...prev,
-      [equipmentId]: {
-        ...data,
-        updatedAt: new Date(), // Important for timeout check
-      },
-    }));
+    const updateData = {
+      ...data,
+      updatedAt: new Date(), // Important for timeout check
+    };
+
+    setLiveEquipmentData((prev) => {
+      const newData = {
+        ...prev,
+        [equipmentId]: updateData,
+      };
+
+      // If this equipment has mapped equipment, update them too
+      if (STATUS_MAPPING[equipmentId]) {
+        STATUS_MAPPING[equipmentId].forEach(mappedId => {
+          newData[mappedId] = {
+            ...updateData,
+            equipmentId: mappedId,
+            id: mappedId,
+          };
+        });
+      }
+
+      return newData;
+    });
   };
 
   const equipmentWithLiveData = useMemo(() => {
@@ -870,6 +900,8 @@ export default function SLDPage() {
                 onPositionChange={handlePositionChange}
                 onOpenModal={setSelectedEquipmentForModal}
                 padding={CANVAS_PADDING}
+                isMapped={isMappedEquipment(node.equipment.equipmentId)}
+                isRealTimeActive={node.equipment.isAlive}
               />
             ))}
           </div>
@@ -1017,6 +1049,8 @@ function EquipmentNode({
   onPositionChange,
   onOpenModal,
   padding,
+  isMapped,
+  isRealTimeActive,
 }) {
   const [showPositionPicker, setShowPositionPicker] = useState(false);
   const [tempColumn, setTempColumn] = useState(node.column);
@@ -1064,6 +1098,8 @@ function EquipmentNode({
         <EquipmentNodeComponent
           data={{ equipment: node.equipment }}
           onOpenModal={onOpenModal}
+          isMapped={isMapped}
+          isRealTimeActive={isRealTimeActive}
         />
 
         {/* Position Picker Modal */}
