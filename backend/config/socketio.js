@@ -1,4 +1,5 @@
-// backend/config/socketio.js - VERIFIED COMPLETE VERSION
+// backend/config/socketio.js
+
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js';
@@ -74,6 +75,17 @@ const initializeSocketIO = (server) => {
   });
 
   logger.info('✅ Socket.IO initialized');
+};
+
+/**
+ * Returns the initialized Socket.IO instance.
+ * @returns {Server} The Socket.IO server instance.
+ */
+const getIO = () => {
+  if (!io) {
+    throw new Error('Socket.io not initialized!');
+  }
+  return io;
 };
 
 // --- Emitter Functions ---
@@ -163,6 +175,7 @@ const broadcastNotification = (userId, notification) => {
 
 export {
   initializeSocketIO,
+  getIO, // <--- Added this export
   emitToUser,
   emitToRole,
   emitToEquipment,

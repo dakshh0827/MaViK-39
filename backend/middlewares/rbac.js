@@ -103,6 +103,9 @@ const can = {
    * @desc Manage (Update) SLD layout: Allowed for Policy Makers and Lab Managers.
    */
   manageSLD: isLabManagerOrAbove,
+
+  viewStudents: isAuthenticated,
+  manageStudents: isLabManagerOrAbove,
 };
 
 // --- Data Filtering Utilities ---

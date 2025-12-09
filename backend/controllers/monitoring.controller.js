@@ -551,11 +551,6 @@ class MonitoringController {
     }
   });
 
-  // Add this method to your monitoring.controller.js
-
-  // Add this fixed method to your monitoring.controller.js
-  // Replace the existing getLabAnalytics method
-
   getLabAnalytics = asyncHandler(async (req, res) => {
     const { labId } = req.params;
     const {
@@ -588,34 +583,25 @@ class MonitoringController {
         });
       }
 
-      // ✅ FIXED: Proper access control for Lab Managers
+      // Access Control
       if (role === "LAB_MANAGER") {
-        // Lab Managers can only access labs in their institute + department
         if (
           lab.instituteId !== userInstituteId ||
           lab.department !== userDepartment
         ) {
-          logger.warn(
-            `❌ Access denied: Lab Manager from ${userInstituteId}/${userDepartment} tried to access ${lab.instituteId}/${lab.department}`
-          );
           return res.status(403).json({
             success: false,
             message: "Access denied to this lab.",
           });
         }
       } else if (role === "TRAINER") {
-        // Trainers can only access their assigned lab
         if (lab.id !== userLabId) {
-          logger.warn(`❌ Access denied: Trainer tried to access wrong lab`);
           return res.status(403).json({
             success: false,
             message: "Access denied to this lab.",
           });
         }
       }
-      // POLICY_MAKER has access to all labs (no check needed)
-
-      logger.info(`✅ Access granted for ${role}`);
 
       // Fetch all equipment in this lab with their analytics
       const equipment = await prisma.equipment.findMany({
@@ -705,7 +691,6 @@ class MonitoringController {
         }
       });
 
-      // Calculate averages
       if (equipment.length > 0) {
         statistics.avgHealthScore = healthScoreSum / equipment.length;
       }
@@ -715,7 +700,7 @@ class MonitoringController {
         statistics.avgUtilization = utilizationSum / equipmentWithData;
       }
 
-      // Department-specific analytics aggregation
+      // Department-specific analytics aggregation (Same as before, omitted for brevity but preserved)
       const departmentMetrics = {
         temperature: [],
         vibration: [],
@@ -734,35 +719,21 @@ class MonitoringController {
       equipment.forEach((eq) => {
         if (eq.analyticsParams) {
           const params = eq.analyticsParams;
-
-          if (params.temperature !== null)
-            departmentMetrics.temperature.push(params.temperature);
-          if (params.vibration !== null)
-            departmentMetrics.vibration.push(params.vibration);
-          if (params.voltage !== null)
-            departmentMetrics.voltage.push(params.voltage);
-          if (params.current !== null)
-            departmentMetrics.current.push(params.current);
-          if (params.powerFactor !== null)
-            departmentMetrics.powerFactor.push(params.powerFactor);
-          if (params.efficiency !== null)
-            departmentMetrics.efficiency.push(params.efficiency);
-          if (params.spindleSpeed !== null)
-            departmentMetrics.spindleSpeed.push(params.spindleSpeed);
-          if (params.feedRate !== null)
-            departmentMetrics.feedRate.push(params.feedRate);
-          if (params.toolWear !== null)
-            departmentMetrics.toolWear.push(params.toolWear);
-          if (params.printQuality !== null)
-            departmentMetrics.printQuality.push(params.printQuality);
-          if (params.solarEfficiency !== null)
-            departmentMetrics.solarEfficiency.push(params.solarEfficiency);
-          if (params.testAccuracy !== null)
-            departmentMetrics.testAccuracy.push(params.testAccuracy);
+          if (params.temperature !== null) departmentMetrics.temperature.push(params.temperature);
+          if (params.vibration !== null) departmentMetrics.vibration.push(params.vibration);
+          if (params.voltage !== null) departmentMetrics.voltage.push(params.voltage);
+          if (params.current !== null) departmentMetrics.current.push(params.current);
+          if (params.powerFactor !== null) departmentMetrics.powerFactor.push(params.powerFactor);
+          if (params.efficiency !== null) departmentMetrics.efficiency.push(params.efficiency);
+          if (params.spindleSpeed !== null) departmentMetrics.spindleSpeed.push(params.spindleSpeed);
+          if (params.feedRate !== null) departmentMetrics.feedRate.push(params.feedRate);
+          if (params.toolWear !== null) departmentMetrics.toolWear.push(params.toolWear);
+          if (params.printQuality !== null) departmentMetrics.printQuality.push(params.printQuality);
+          if (params.solarEfficiency !== null) departmentMetrics.solarEfficiency.push(params.solarEfficiency);
+          if (params.testAccuracy !== null) departmentMetrics.testAccuracy.push(params.testAccuracy);
         }
       });
 
-      // Calculate averages for department metrics
       const avgDepartmentMetrics = {};
       Object.keys(departmentMetrics).forEach((key) => {
         const values = departmentMetrics[key];
@@ -775,8 +746,6 @@ class MonitoringController {
           };
         }
       });
-
-      logger.info(`✅ Lab analytics compiled successfully for ${labId}`);
 
       res.json({
         success: true,
@@ -799,6 +768,10 @@ class MonitoringController {
             status: eq.status,
             analyticsParams: eq.analyticsParams,
             lastUsedAt: eq.status?.lastUsedAt,
+            // ✅ ADDED THESE 3 LINES:
+            isLocked: eq.isLocked,
+            requiresAuthentication: eq.requiresAuthentication,
+            currentUserId: eq.currentUserId,
           })),
         },
       });

@@ -1,11 +1,17 @@
+// backend/server.js
+
 // =================== IMPORTS ===================
 import dotenv from 'dotenv';
 import http from 'http';
-import app from './app.js'; // Import the clean app
+import app from './app.js'; 
 import { initializeSocketIO } from './config/socketio.js';
 import prisma from './config/database.js';
 import logger from './utils/logger.js';
 import firebaseService from './services/firebase.service.js';
+
+// --- JOBS ---
+import { scheduleBreakdownCheck } from './jobs/breakdown.scheduler.js';
+import { scheduleAutoLock } from './jobs/autoLock.scheduler.js'; // <--- IMPORT THIS
 
 // =================== CONFIG ===================
 dotenv.config();
@@ -23,10 +29,16 @@ server.listen(PORT, async () => {
     await prisma.$connect();
     logger.info('✅ Database connected successfully');
     logger.info(`🚀 Server running on port ${PORT}`);
-    logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
-    logger.info(`🌐 API URL: http://localhost:${PORT}`);
+    
+    // Start Services
     await firebaseService.startAllListeners();
     logger.info('✅ Firebase listeners started');
+
+    // Start Schedulers
+    scheduleBreakdownCheck();
+    scheduleAutoLock(); // <--- START THE SCHEDULER
+    logger.info('✅ Background schedulers started');
+
   } catch (error) {
     logger.error('❌ Failed to start server:', error);
     process.exit(1);
@@ -46,15 +58,5 @@ const shutdown = async (signal) => {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
-
-// =================== ERROR EVENTS ===================
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
-  process.exit(1);
-});
 
 export default server;

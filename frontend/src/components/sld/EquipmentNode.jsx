@@ -2,7 +2,7 @@
  * =====================================================
  * frontend/src/components/sld/EquipmentNode.jsx
  * =====================================================
- * Updated: Wider (210px), Rounded Corners (Pill), Offline Data Logic
+ * Updated: Status dot based on mapping and real-time status
  */
 import { memo } from "react";
 
@@ -30,33 +30,33 @@ const getDisplayStatus = (backendStatus) => {
   return "OFFLINE";
 };
 
-function EquipmentNodeComponent({ data, onOpenModal }) {
+function EquipmentNodeComponent({ data, onOpenModal, isMapped, isRealTimeActive }) {
   const equipment = data.equipment;
   const displayStatusKey = getDisplayStatus(equipment.status?.status);
-  const config = STATUS_CONFIG[displayStatusKey];
+  
+  // Determine dot color based on mapping and real-time status
+  let dotColor = "bg-red-500"; // Default: OFF (red)
+  
+  if (isMapped && isRealTimeActive) {
+    dotColor = "bg-emerald-500"; // Mapped equipment is ON (green)
+  }
 
-  // --- ENERGY LOGIC FIX ---
+  // --- ENERGY LOGIC ---
   const currentConsumption = equipment.status?.energyConsumption;
   const lastRecordedConsumption = equipment.status?.lastEnergyConsumption;
 
   let displayConsumption = 0;
 
   if (displayStatusKey === "ONLINE") {
-    // If Online, use current real-time consumption
     displayConsumption = currentConsumption ?? 0;
   } else {
-    // If Offline (Faulty, Idle, etc.), STRICTLY use lastRecordedConsumption
-    // If lastRecorded is null/undefined, it defaults to 0 (meaning no history available)
     displayConsumption = lastRecordedConsumption ?? 0;
   }
 
+  const config = STATUS_CONFIG[displayStatusKey];
+
   return (
     <div className="relative group" onClick={() => onOpenModal(equipment)}>
-      {/* RECTANGLE CARD 
-          Width: 210px (Increased to fit long IDs)
-          Height: 46px (Comfortable height)
-          Rounded: rounded-full (Pill shape for softer look)
-      */}
       <div
         className={`
           relative w-[210px] h-[46px] bg-white rounded-2xl border border-gray-400 
@@ -66,11 +66,18 @@ function EquipmentNodeComponent({ data, onOpenModal }) {
       >
         {/* LEFT: Status Dot + ID */}
         <div className="flex items-center gap-3 overflow-hidden">
-          <div
-            className={`w-3 h-3 rounded-full ${config.dotColor} flex-shrink-0 shadow-sm`}
-          ></div>
-          {/* ID with flex-shrink to ensure it truncates if absolutely necessary, 
-              but width is increased to avoid this. */}
+          {/* Status dot with pulsing animation when ON */}
+          <div className="relative flex-shrink-0">
+            <div
+              className={`w-3 h-3 rounded-full ${dotColor} shadow-sm ${
+                isMapped && isRealTimeActive ? 'animate-pulse' : ''
+              }`}
+            ></div>
+            {/* Glow effect when ON */}
+            {isMapped && isRealTimeActive && (
+              <div className="absolute inset-0 w-3 h-3 rounded-full bg-emerald-400 opacity-50 blur-sm"></div>
+            )}
+          </div>
           <span className="text-md font-mono font-bold text-gray-700 truncate tracking-tight">
             {equipment.equipmentId}
           </span>
