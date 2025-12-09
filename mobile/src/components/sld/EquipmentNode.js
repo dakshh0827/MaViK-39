@@ -1,50 +1,56 @@
 import React, { memo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+} from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 // --- CONFIGURATION ---
 const STATUS_CONFIG = {
-  OPERATIONAL: {
+  ONLINE: {
     color: "#10B981", // Emerald 500
-    bg: "#ECFDF5", // Emerald 50
-    icon: "check-circle",
-    label: "Operational",
+    energyColor: "#059669", // Darker Emerald text
   },
-  IN_USE: {
-    color: "#3B82F6", // Blue 500
-    bg: "#EFF6FF", // Blue 50
-    icon: "pulse",
-    label: "In Use",
-  },
-  IDLE: {
-    color: "#9CA3AF", // Gray 400
-    bg: "#F3F4F6", // Gray 100
-    icon: "clock-outline",
-    label: "Idle",
+  OFFLINE: {
+    color: "#EF4444", // Red 500
+    energyColor: "#DC2626", // Darker Red text
   },
 };
 
-const getDisplayStatus = (backendStatus) => {
-  if (!backendStatus) return "IDLE";
-  const status = backendStatus.toUpperCase();
-  if (status === "IN_USE" || status === "IN_CLASS") return "IN_USE";
-  if (status === "OPERATIONAL") return "OPERATIONAL";
-  return "IDLE";
+const getDisplayStatus = (equipment) => {
+  if (!equipment.isAlive) return "OFFLINE";
+  const status = equipment.status?.status?.toUpperCase();
+  if (
+    status === "OPERATIONAL" ||
+    status === "IN_USE" ||
+    status === "IN_CLASS"
+  ) {
+    return "ONLINE";
+  }
+  return "OFFLINE";
 };
 
 const EquipmentNode = ({ node, isEditMode, onPositionPress, onNodePress }) => {
   const { equipment } = node;
-  const displayStatus = getDisplayStatus(equipment.status?.status);
-  const config = STATUS_CONFIG[displayStatus];
-  const healthScore = equipment.status?.healthScore || 0;
+
+  // 1. Status & Config
+  const displayStatusKey = getDisplayStatus(equipment);
+  const config = STATUS_CONFIG[displayStatusKey];
+
+  // 2. Energy Logic
+  const currentConsumption = equipment.status?.energyConsumption;
+  const lastRecordedConsumption = equipment.status?.lastEnergyConsumption;
   const unresolvedAlerts = equipment._count?.alerts || 0;
 
-  const getHealthColor = (score) => {
-    if (score >= 80) return "#059669"; // Green
-    if (score >= 60) return "#D97706"; // Amber
-    if (score >= 40) return "#EA580C"; // Orange
-    return "#DC2626"; // Red
-  };
+  let displayConsumption = 0;
+  if (displayStatusKey === "ONLINE") {
+    displayConsumption = currentConsumption ?? 0;
+  } else {
+    displayConsumption = lastRecordedConsumption ?? 0;
+  }
 
   return (
     <View
@@ -56,7 +62,7 @@ const EquipmentNode = ({ node, isEditMode, onPositionPress, onNodePress }) => {
         },
       ]}
     >
-      {/* --- EDIT BADGE (Visible only in Edit Mode) --- */}
+      {/* --- EDIT HANDLE --- */}
       {isEditMode && (
         <TouchableOpacity
           style={styles.editBadge}
@@ -70,9 +76,6 @@ const EquipmentNode = ({ node, isEditMode, onPositionPress, onNodePress }) => {
             size={12}
             color="white"
           />
-          <Text style={styles.editBadgeText}>
-            C{node.column + 1} R{node.row + 1}
-          </Text>
         </TouchableOpacity>
       )}
 
@@ -83,47 +86,26 @@ const EquipmentNode = ({ node, isEditMode, onPositionPress, onNodePress }) => {
         </View>
       )}
 
-      {/* --- MAIN CARD --- */}
+      {/* --- MAIN PILL CARD --- */}
       <TouchableOpacity
-        activeOpacity={0.9}
+        activeOpacity={0.8}
         onPress={() => onNodePress(equipment)}
-        style={[styles.card, { borderColor: config.color + "40" }]} // 40 is hex opacity
+        style={styles.pillContainer}
       >
-        {/* Color Bar Top */}
-        <View style={[styles.statusBar, { backgroundColor: config.color }]} />
+        {/* LEFT: Dot + ID */}
+        <View style={styles.leftContainer}>
+          <View style={[styles.statusDot, { backgroundColor: config.color }]} />
+          <Text style={styles.idText} numberOfLines={1} ellipsizeMode="tail">
+            {equipment.equipmentId}
+          </Text>
+        </View>
 
-        <View style={styles.content}>
-          {/* Header */}
-          <View>
-            <Text numberOfLines={1} ellipsizeMode="tail" style={styles.name}>
-              {equipment.name}
-            </Text>
-            <Text style={styles.idText}>{equipment.equipmentId}</Text>
-          </View>
-
-          {/* Metrics */}
-          <View style={styles.metricsContainer}>
-            {/* Status Row */}
-            <View style={styles.metricRow}>
-              <View style={styles.statusChip}>
-                <View style={[styles.dot, { backgroundColor: config.color }]} />
-                <Text style={styles.statusText}>{config.label}</Text>
-              </View>
-            </View>
-
-            {/* Health Row */}
-            <View style={styles.metricRow}>
-              <Text style={styles.label}>Health</Text>
-              <Text
-                style={[
-                  styles.healthText,
-                  { color: getHealthColor(healthScore) },
-                ]}
-              >
-                {healthScore.toFixed(0)}%
-              </Text>
-            </View>
-          </View>
+        {/* RIGHT: Energy */}
+        <View style={styles.rightContainer}>
+          <Text style={[styles.energyText, { color: config.energyColor }]}>
+            {displayConsumption.toFixed(1)}
+            <Text style={styles.unitText}> kW</Text>
+          </Text>
         </View>
       </TouchableOpacity>
     </View>
@@ -133,95 +115,76 @@ const EquipmentNode = ({ node, isEditMode, onPositionPress, onNodePress }) => {
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    width: 140, // Match NODE_WIDTH
+    width: 220, // Explicit width matching the web
+    height: 50,
     zIndex: 10,
   },
-  card: {
+  pillContainer: {
+    width: "80%",
+    height: 40, // Web app height
     backgroundColor: "white",
-    borderRadius: 8,
+    borderRadius: 15, // Fully rounded ends (Pill)
     borderWidth: 1,
+    borderColor: "#9CA3AF", // Gray 400 (matching web border)
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16, // px-5 equivalent
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-    overflow: "hidden",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  statusBar: {
-    height: 4,
-    width: "100%",
+  leftContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 10,
+    overflow: "hidden", // Ensure text doesn't bleed
   },
-  content: {
-    padding: 10,
-  },
-  name: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 2,
+  statusDot: {
+    width: 10, // w-3 equivalent approx
+    height: 10, // h-3
+    borderRadius: 5,
+    marginRight: 8,
   },
   idText: {
-    fontSize: 10,
-    color: "#6B7280",
-    fontFamily: "System",
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#374151", // Gray 700
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace", // Monospace font
   },
-  metricsContainer: {
-    marginTop: 8,
-    gap: 4,
+  rightContainer: {
+    flexShrink: 0,
   },
-  metricRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  energyText: {
+    fontSize: 14,
+    fontWeight: "700",
   },
-  statusChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+  unitText: {
+    fontSize: 12,
+    color: "#9CA3AF", // Gray 400
+    fontWeight: "500",
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 10,
-    color: "#4B5563",
-  },
-  label: {
-    fontSize: 10,
-    color: "#6B7280",
-  },
-  healthText: {
-    fontSize: 11,
-    fontWeight: "bold",
-  },
+  // Overlays
   editBadge: {
     position: "absolute",
     top: -10,
     alignSelf: "center",
     backgroundColor: "#2563EB",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    zIndex: 20,
-    flexDirection: "row",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 4,
-  },
-  editBadgeText: {
-    color: "white",
-    fontSize: 10,
-    fontWeight: "bold",
-    marginLeft: 2,
+    zIndex: 20,
+    elevation: 5,
   },
   alertBadge: {
     position: "absolute",
-    top: -6,
-    right: -6,
+    top: -5,
+    right: 5,
     backgroundColor: "#DC2626",
     width: 18,
     height: 18,

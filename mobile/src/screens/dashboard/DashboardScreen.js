@@ -475,13 +475,31 @@ export default function DashboardScreen({ navigation }) {
               <Text style={styles.labTitle}>Lab Overview</Text>
             </View>
 
+            {/* Modified Button: Redirects to Lab Analytics */}
             <TouchableOpacity
-              style={styles.viewAllButton}
-              onPress={() => navigation.navigate("EquipmentListScreen")}
+              style={[
+                styles.viewAllButton,
+                // Optional: visual feedback if "all" is selected
+                selectedLabId === "all" && {
+                  opacity: 0.6,
+                  backgroundColor: "#E5E7EB",
+                },
+              ]}
+              onPress={() => {
+                if (selectedLabId === "all") {
+                  Alert.alert(
+                    "Select a Lab",
+                    "Please select a specific lab from the dropdown menu to view its analytics."
+                  );
+                } else {
+                  // Pass the selected lab ID to the new screen
+                  navigation.navigate("LabAnalytics", { labId: selectedLabId });
+                }
+              }}
             >
-              <Text style={styles.viewAllText}>View All</Text>
+              <Text style={styles.viewAllText}>View Analytics</Text>
               <MaterialCommunityIcons
-                name="arrow-right"
+                name="chart-box-outline" // Changed icon to represent analytics
                 size={16}
                 color="#2563EB"
               />

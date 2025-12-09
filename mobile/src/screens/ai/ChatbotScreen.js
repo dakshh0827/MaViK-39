@@ -6,156 +6,359 @@ import {
   KeyboardAvoidingView,
   Platform,
   FlatList,
+  Keyboard,
 } from "react-native";
 import {
   TextInput,
   IconButton,
-  Surface,
   Text,
   ActivityIndicator,
+  SegmentedButtons,
+  Button,
+  Chip,
+  useTheme,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+// Import your store
+import { useChatbotStore } from "../../stores/chatbotStore";
+
 export default function ChatbotScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [inputText, setInputText] = useState("");
-  const [loading, setLoading] = useState(false);
+  const theme = useTheme();
   const flatListRef = useRef(null);
 
-  // Initial welcome message
-  const [messages, setMessages] = useState([
-    {
-      id: "1",
-      text: "Hello! I am your Lab Assistant AI. I can help you find equipment, check maintenance schedules, or answer questions about lab safety. How can I help you today?",
-      sender: "ai",
-      timestamp: new Date(),
-    },
-  ]);
+  // --- STATE ---
+  const [viewMode, setViewMode] = useState("chat");
+  const [inputText, setInputText] = useState("");
 
-  const sendMessage = async () => {
-    if (!inputText.trim()) return;
+  // --- STORE HOOKS ---
+  const {
+    messages,
+    sendMessage,
+    isLoading: isChatLoading,
+    clearHistory,
+    generateBriefing,
+    initSession,
+  } = useChatbotStore();
 
-    const userMsg = {
-      id: Date.now().toString(),
-      text: inputText,
-      sender: "user",
-      timestamp: new Date(),
-    };
+  const [briefingResponse, setBriefingResponse] = useState(null);
+  const [isBriefingLoading, setIsBriefingLoading] = useState(false);
 
-    setMessages((prev) => [...prev, userMsg]);
-    setInputText("");
-    setLoading(true);
-
-    // --- MOCK API CALL (Replace with your actual backend call) ---
-    try {
-      // Simulate network delay
-      setTimeout(() => {
-        const aiMsg = {
-          id: (Date.now() + 1).toString(),
-          text: "I'm processing your request. (This is a placeholder response until the backend AI is connected).",
-          sender: "ai",
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, aiMsg]);
-        setLoading(false);
-      }, 1500);
-    } catch (error) {
-      console.error(error);
-      setLoading(false);
-    }
-    // -----------------------------------------------------------
-  };
-
+  // Init Session on Load
   useEffect(() => {
-    // Auto-scroll to bottom when messages change
-    if (flatListRef.current) {
+    initSession();
+  }, []);
+
+  // Auto-scroll Chat
+  useEffect(() => {
+    if (viewMode === "chat" && flatListRef.current) {
       setTimeout(
         () => flatListRef.current.scrollToEnd({ animated: true }),
-        100
+        200
       );
     }
-  }, [messages, loading]);
+  }, [messages, viewMode, isChatLoading]);
+
+  // --- HANDLERS ---
+  const handleSend = async () => {
+    if (!inputText.trim() || isChatLoading) return;
+    const text = inputText;
+    setInputText("");
+    Keyboard.dismiss();
+    await sendMessage(text);
+  };
+
+  const handleQuickAction = (action) => {
+    setInputText("");
+    sendMessage(action);
+  };
+
+  const handleGenerateBriefing = async () => {
+    setIsBriefingLoading(true);
+    setBriefingResponse(null);
+    const prompt =
+      "Give me the detailed daily report of all the CNC_LATHE, Laser_Engraver, Manual_Arc_Welder machines for today";
+    try {
+      const response = await generateBriefing(prompt);
+      setBriefingResponse(response);
+    } catch (error) {
+      setBriefingResponse(
+        "Failed to generate briefing. Please check connection."
+      );
+    } finally {
+      setIsBriefingLoading(false);
+    }
+  };
+
+  const clearBriefing = () => {
+    setBriefingResponse(null);
+  };
+
+  // ==========================================
+  // RENDER HELPERS
+  // ==========================================
 
   const renderMessage = ({ item }) => {
-    const isUser = item.sender === "user";
+    const isUser = item.role === "user" || item.sender === "user";
+    const text = item.content || item.message || item.text || item.response;
+
     return (
       <View style={[styles.messageRow, isUser ? styles.userRow : styles.aiRow]}>
         {!isUser && (
-          <View style={styles.aiAvatar}>
-            <MaterialCommunityIcons name="robot" size={20} color="white" />
+          <View
+            style={[
+              styles.avatar,
+              { backgroundColor: theme.colors.secondaryContainer },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="robot"
+              size={18}
+              color={theme.colors.onSecondaryContainer}
+            />
           </View>
         )}
-        <Surface
-          style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}
-          elevation={1}
+
+        {/* FIXED: Replaced Surface with View to fix "double edge" shadow artifact */}
+        <View
+          style={[
+            styles.bubble,
+            isUser
+              ? {
+                  backgroundColor: theme.colors.primary,
+                  borderTopLeftRadius: 20,
+                  borderTopRightRadius: 20,
+                  borderBottomLeftRadius: 20,
+                  borderBottomRightRadius: 2, // Sharp corner for user
+                }
+              : {
+                  backgroundColor: "white",
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                  borderTopLeftRadius: 20,
+                  borderTopRightRadius: 20,
+                  borderBottomRightRadius: 20,
+                  borderBottomLeftRadius: 2, // Sharp corner for AI
+                },
+          ]}
         >
-          <Text style={[styles.msgText, isUser && styles.userMsgText]}>
-            {item.text}
+          <Text
+            style={[
+              styles.msgText,
+              isUser ? { color: "white" } : { color: "#1F2937" },
+            ]}
+          >
+            {text}
           </Text>
-        </Surface>
+        </View>
+
+        {isUser && (
+          <View
+            style={[
+              styles.avatar,
+              { backgroundColor: theme.colors.primaryContainer, marginLeft: 8 },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="account"
+              size={18}
+              color={theme.colors.onPrimaryContainer}
+            />
+          </View>
+        )}
       </View>
     );
   };
 
+  const quickActions = [
+    "Show equipment status",
+    "Recent alerts",
+    "Maintenance schedule",
+    "Analytics overview",
+  ];
+
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-      {/* Header */}
+      {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <IconButton
-          icon="arrow-left"
-          size={24}
-          onPress={() => navigation.goBack()}
-        />
-        <View>
-          <Text style={styles.headerTitle}>Lab AI Assistant</Text>
-          <Text style={styles.headerSubtitle}>Always online</Text>
+        <View style={styles.headerTop}>
+          <IconButton
+            icon="arrow-left"
+            size={24}
+            onPress={() => navigation.goBack()}
+          />
+          <View>
+            <Text style={styles.headerTitle}>AI Ops Center</Text>
+            <Text style={styles.headerSubtitle}>Powered by MaViK-39</Text>
+          </View>
+          <View style={{ flex: 1 }} />
+          <IconButton
+            icon="delete-outline"
+            iconColor={theme.colors.error}
+            size={22}
+            onPress={viewMode === "chat" ? clearHistory : clearBriefing}
+          />
+        </View>
+
+        <View style={styles.tabContainer}>
+          <SegmentedButtons
+            value={viewMode}
+            onValueChange={setViewMode}
+            buttons={[
+              {
+                value: "chat",
+                label: "Assistant",
+                icon: "message-text-outline",
+              },
+              {
+                value: "briefing",
+                label: "Daily Briefing",
+                icon: "file-chart-outline",
+              },
+            ]}
+          />
         </View>
       </View>
 
-      {/* Chat Area */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessage}
-        contentContainerStyle={styles.listContent}
-        style={{ flex: 1 }}
-      />
+      <View style={styles.contentArea}>
+        {/* CHAT VIEW */}
+        {viewMode === "chat" && (
+          <>
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={renderMessage}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <View
+                    style={[
+                      styles.largeIcon,
+                      { backgroundColor: theme.colors.secondaryContainer },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="robot"
+                      size={40}
+                      color={theme.colors.onSecondaryContainer}
+                    />
+                  </View>
+                  <Text style={styles.emptyTitle}>How can I help?</Text>
+                  <Text style={styles.emptySubtitle}>
+                    Ask about status, schedules, or alerts.
+                  </Text>
 
-      {/* Loading Indicator */}
-      {loading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color="#2563EB" />
-          <Text style={styles.loadingText}>AI is thinking...</Text>
-        </View>
-      )}
+                  <View style={styles.quickActionContainer}>
+                    {quickActions.map((action, index) => (
+                      <Chip
+                        key={index}
+                        style={styles.chip}
+                        onPress={() => handleQuickAction(action)}
+                        icon="lightning-bolt-outline"
+                      >
+                        {action}
+                      </Chip>
+                    ))}
+                  </View>
+                </View>
+              }
+            />
 
-      {/* Input Area */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-      >
-        <View style={styles.inputContainer}>
-          <TextInput
-            mode="outlined"
-            placeholder="Type a message..."
-            value={inputText}
-            onChangeText={setInputText}
-            style={styles.textInput}
-            outlineColor="#E5E7EB"
-            activeOutlineColor="#2563EB"
-            right={
-              <TextInput.Icon
-                icon="send"
-                color={inputText.trim() ? "#2563EB" : "#9CA3AF"}
-                disabled={!inputText.trim() || loading}
-                onPress={sendMessage}
-              />
-            }
-          />
-        </View>
-      </KeyboardAvoidingView>
+            {isChatLoading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size={16} color={theme.colors.primary} />
+                <Text style={styles.loadingText}>
+                  MaViK-39 is processing...
+                </Text>
+              </View>
+            )}
+
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+            >
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  mode="outlined"
+                  placeholder="Type your message..."
+                  value={inputText}
+                  onChangeText={setInputText}
+                  style={styles.textInput}
+                  outlineStyle={{ borderRadius: 24 }}
+                  right={
+                    <TextInput.Icon
+                      icon="send"
+                      color={
+                        inputText.trim() ? theme.colors.primary : "#9CA3AF"
+                      }
+                      disabled={!inputText.trim() || isChatLoading}
+                      onPress={handleSend}
+                    />
+                  }
+                />
+              </View>
+            </KeyboardAvoidingView>
+          </>
+        )}
+
+        {/* BRIEFING VIEW */}
+        {viewMode === "briefing" && (
+          <View style={styles.briefingContainer}>
+            <ScrollView contentContainerStyle={styles.briefingScroll}>
+              {!briefingResponse && !isBriefingLoading ? (
+                <View style={styles.emptyState}>
+                  <View
+                    style={[styles.largeIcon, { backgroundColor: "#DBEAFE" }]}
+                  >
+                    <MaterialCommunityIcons
+                      name="chart-line"
+                      size={40}
+                      color="#2563EB"
+                    />
+                  </View>
+                  <Text style={styles.emptyTitle}>Daily Report Ready</Text>
+                  <Text style={styles.emptySubtitle}>
+                    Generate a summary for CNC Lathe, Laser Engraver, and
+                    Welding units.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.briefingCard}>
+                  {isBriefingLoading ? (
+                    <View style={{ padding: 40, alignItems: "center" }}>
+                      <ActivityIndicator
+                        size="large"
+                        color={theme.colors.primary}
+                      />
+                      <Text style={{ marginTop: 15, color: "#6B7280" }}>
+                        Generating Analytics Report...
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.briefingText}>{briefingResponse}</Text>
+                  )}
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.briefingFooter}>
+              <Button
+                mode="contained"
+                onPress={handleGenerateBriefing}
+                loading={isBriefingLoading}
+                disabled={isBriefingLoading}
+                icon="play-circle-outline"
+                style={{ borderRadius: 8 }}
+                contentStyle={{ height: 48 }}
+              >
+                Generate Daily Report
+              </Button>
+            </View>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -166,13 +369,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "white",
-    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
     zIndex: 10,
+  },
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    marginBottom: 8,
   },
   headerTitle: {
     fontSize: 18,
@@ -181,8 +387,14 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 12,
-    color: "#10B981", // Green for online status
-    fontWeight: "500",
+    color: "#6B7280",
+  },
+  tabContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  contentArea: {
+    flex: 1,
   },
   listContent: {
     padding: 16,
@@ -192,6 +404,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     flexDirection: "row",
     alignItems: "flex-end",
+    maxWidth: "100%",
   },
   userRow: {
     justifyContent: "flex-end",
@@ -199,49 +412,38 @@ const styles = StyleSheet.create({
   aiRow: {
     justifyContent: "flex-start",
   },
-  aiAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#2563EB",
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 8,
   },
+  // UPDATED BUBBLE STYLE
   bubble: {
-    maxWidth: "80%",
+    maxWidth: "75%",
     padding: 12,
-    borderRadius: 16,
-  },
-  userBubble: {
-    backgroundColor: "#2563EB",
-    borderBottomRightRadius: 4,
-  },
-  aiBubble: {
-    backgroundColor: "white",
-    borderBottomLeftRadius: 4,
+    // Note: Border radii are now handled inline in renderMessage for specificity
   },
   msgText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#374151",
-  },
-  userMsgText: {
-    color: "white",
+    fontSize: 15,
+    lineHeight: 22,
   },
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
     paddingBottom: 10,
+    justifyContent: "center",
   },
   loadingText: {
     marginLeft: 8,
     color: "#6B7280",
     fontSize: 12,
   },
-  inputContainer: {
-    padding: 12,
+  inputWrapper: {
+    padding: 10,
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
@@ -249,5 +451,74 @@ const styles = StyleSheet.create({
   textInput: {
     backgroundColor: "white",
     maxHeight: 100,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 60,
+  },
+  largeIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+    textAlign: "center",
+    maxWidth: 250,
+    marginBottom: 24,
+  },
+  quickActionContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    maxWidth: 300,
+  },
+  chip: {
+    backgroundColor: "white",
+    borderColor: "#E5E7EB",
+    borderWidth: 1,
+  },
+  briefingContainer: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+  },
+  briefingScroll: {
+    padding: 16,
+    flexGrow: 1,
+  },
+  briefingCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  briefingText: {
+    fontSize: 14,
+    color: "#374151",
+    lineHeight: 24,
+  },
+  briefingFooter: {
+    padding: 16,
+    backgroundColor: "white",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
   },
 });

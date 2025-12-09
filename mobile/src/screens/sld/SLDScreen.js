@@ -6,7 +6,6 @@ import {
   Alert,
   Dimensions,
   TouchableOpacity,
-  Modal,
 } from "react-native";
 import {
   Text,
@@ -17,32 +16,26 @@ import {
   TextInput,
   Menu,
   IconButton,
-  FAB,
   Chip,
-  Divider,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Svg, { Path, Marker, Defs, Circle } from "react-native-svg";
+import { LinearGradient } from "expo-linear-gradient"; // IMPORT ADDED
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "../../context/useAuthStore";
 import client from "../../api/client";
 import EquipmentNode from "../../components/sld/EquipmentNode";
+import io from "socket.io-client";
 
-// --- LAYOUT CONSTANTS ---
-const NODE_WIDTH = 140;
-const COLUMN_WIDTH = 180;
-const ROW_HEIGHT = 160;
-const ROOT_WIDTH = 240;
-const ROOT_HEIGHT = 80;
-const CANVAS_PADDING = 50;
+// --- REDUCED LAYOUT CONSTANTS ---
+const NODE_WIDTH = 180;
+const NODE_HEIGHT = 38;
+const COLUMN_WIDTH = 240;
+const ROW_HEIGHT = 90;
+const ROOT_WIDTH = 250;
+const ROOT_HEIGHT = 60;
+const CANVAS_PADDING = 40;
 const BUS_OFFSET = 40;
-
-// --- STATUS LEGEND COLORS ---
-const STATUS_LEGEND = [
-  { label: "Operational", color: "#10B981" }, // Emerald 500
-  { label: "In Use", color: "#3B82F6" }, // Blue 500
-  { label: "Idle", color: "#9CA3AF" }, // Gray 400
-];
 
 export default function SLDScreen({ navigation }) {
   const { user } = useAuthStore();
@@ -54,35 +47,74 @@ export default function SLDScreen({ navigation }) {
   const [labs, setLabs] = useState([]);
   const [selectedLabId, setSelectedLabId] = useState(null);
   const [equipment, setEquipment] = useState([]);
+  const [liveEquipmentData, setLiveEquipmentData] = useState({});
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  const [socket, setSocket] = useState(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+
   const [equipmentPositions, setEquipmentPositions] = useState({});
   const [numColumns, setNumColumns] = useState(3);
 
-  // Dropdown Visibility State
   const [labMenuVisible, setLabMenuVisible] = useState(false);
-
-  // Edit Mode
   const [isEditMode, setIsEditMode] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Modals
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   const [positionModalVisible, setPositionModalVisible] = useState(false);
   const [tempPos, setTempPos] = useState({ col: 0, row: 0 });
   const [editingNodeId, setEditingNodeId] = useState(null);
 
-  // --- 1. Initial Data Load ---
+  // --- Socket & Init ---
   useEffect(() => {
     fetchLabs();
+
+    let socketUrl = client.defaults.baseURL;
+    if (socketUrl) {
+      socketUrl = socketUrl.replace("/api", "");
+    } else {
+      socketUrl = "http://192.168.1.15:5000";
+    }
+
+    const socketInstance = io(socketUrl, {
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+    });
+
+    socketInstance.on("connect", () => setIsSocketConnected(true));
+    socketInstance.on("disconnect", () => setIsSocketConnected(false));
+    socketInstance.on("equipment:status", (data) =>
+      handleEquipmentUpdate(data)
+    );
+    socketInstance.on("equipment:status:update", (data) =>
+      handleEquipmentUpdate(data.status || data)
+    );
+
+    setSocket(socketInstance);
+
+    const interval = setInterval(() => setCurrentTime(Date.now()), 2000);
+    return () => {
+      socketInstance.disconnect();
+      clearInterval(interval);
+    };
   }, []);
+
+  const handleEquipmentUpdate = (data) => {
+    const equipmentId = data.equipmentId || data.id;
+    if (!equipmentId) return;
+    setLiveEquipmentData((prev) => ({
+      ...prev,
+      [equipmentId]: { ...data, updatedAt: new Date() },
+    }));
+  };
 
   const fetchLabs = async () => {
     try {
       const res = await client.get("/labs");
-      const fetchedLabs = res.data.data || [];
-      setLabs(fetchedLabs);
-
+      setLabs(res.data.data || []);
       if (user?.role === "TRAINER" && user.lab?.labId) {
         setSelectedLabId(user.lab.labId);
       }
@@ -91,7 +123,6 @@ export default function SLDScreen({ navigation }) {
     }
   };
 
-  // --- 2. Load Equipment & Layout when Lab changes ---
   useEffect(() => {
     if (selectedLabId && selectedLabId !== "all") {
       loadLabData(selectedLabId);
@@ -103,12 +134,11 @@ export default function SLDScreen({ navigation }) {
   const loadLabData = async (labId) => {
     setLoading(true);
     try {
-      // 1. Fetch Equipment
       const eqRes = await client.get("/equipment", { params: { labId } });
       const eqData = eqRes.data.data || [];
       setEquipment(eqData);
+      setLiveEquipmentData({});
 
-      // Default Layout
       const defaultCols = eqData.length > 0 ? Math.min(3, eqData.length) : 3;
       const defaultPositions = {};
       eqData.forEach((eq, index) => {
@@ -117,11 +147,9 @@ export default function SLDScreen({ navigation }) {
         defaultPositions[eq.id] = { column: col, row };
       });
 
-      // 2. Fetch Layout
       try {
         const layoutRes = await client.get(`/sld-layouts/${labId}`);
         const savedLayout = layoutRes.data?.data || layoutRes.data;
-
         if (savedLayout && savedLayout.positions) {
           setEquipmentPositions(savedLayout.positions);
           setNumColumns(savedLayout.numColumns || defaultCols);
@@ -130,20 +158,16 @@ export default function SLDScreen({ navigation }) {
           setNumColumns(defaultCols);
         }
       } catch (layoutErr) {
-        console.log(
-          `No custom layout found at /sld-layouts/${labId}, using default.`
-        );
         setEquipmentPositions(defaultPositions);
         setNumColumns(defaultCols);
       }
     } catch (err) {
-      console.error("Error loading lab data:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- 3. Save Layout ---
   const saveLayout = async () => {
     if (!isLabManager) return;
     setIsSaving(true);
@@ -152,15 +176,11 @@ export default function SLDScreen({ navigation }) {
         numColumns,
         positions: equipmentPositions,
       });
-
       setHasUnsavedChanges(false);
-      Alert.alert("Success", "Layout saved successfully!");
+      Alert.alert("Success", "Layout saved!");
       setIsEditMode(false);
     } catch (err) {
-      console.error("Save Layout Error:", err.response?.data || err.message);
-      const errorMessage =
-        err.response?.data?.message || "Failed to save layout";
-      Alert.alert("Error", errorMessage);
+      Alert.alert("Error", "Failed to save");
     } finally {
       setIsSaving(false);
     }
@@ -172,13 +192,46 @@ export default function SLDScreen({ navigation }) {
     if (selectedLabId) loadLabData(selectedLabId);
   };
 
-  // --- 4. Layout Generation ---
+  const getLabNameOnly = (fullName) => {
+    if (!fullName) return "Lab Main";
+    const parts = fullName.split(/[-–,]/);
+    const lastName = parts[parts.length - 1];
+    return lastName ? lastName.trim() : fullName;
+  };
+
+  // --- MERGE DATA ---
+  const equipmentWithLiveData = useMemo(() => {
+    if (!equipment || equipment.length === 0) return [];
+    return equipment.map((eq) => {
+      const liveData = liveEquipmentData[eq.id];
+      let isAlive = false;
+      if (liveData && liveData.updatedAt) {
+        if (currentTime - new Date(liveData.updatedAt).getTime() < 30000)
+          isAlive = true;
+      }
+      return {
+        ...eq,
+        isAlive,
+        status: liveData
+          ? {
+              ...eq.status,
+              status: liveData.status || eq.status?.status,
+              energyConsumption:
+                liveData.energyConsumption ?? eq.status?.energyConsumption,
+              lastEnergyConsumption: eq.status?.lastEnergyConsumption,
+            }
+          : { ...eq.status, isAlive: false },
+      };
+    });
+  }, [equipment, liveEquipmentData, currentTime]);
+
+  // --- LAYOUT ENGINE ---
   const layout = useMemo(() => {
-    if (equipment.length === 0)
+    if (equipmentWithLiveData.length === 0)
       return { nodes: [], connections: [], w: 0, h: 0 };
 
     const positions = { ...equipmentPositions };
-    equipment.forEach((eq, index) => {
+    equipmentWithLiveData.forEach((eq, index) => {
       if (!positions[eq.id]) {
         positions[eq.id] = {
           column: index % numColumns,
@@ -195,23 +248,15 @@ export default function SLDScreen({ navigation }) {
 
     const rootX = (totalWidth - ROOT_WIDTH) / 2;
     const rootY = CANVAS_PADDING;
-    const equipmentStartY = rootY + ROOT_HEIGHT + 80;
+    const equipmentStartY = rootY + ROOT_HEIGHT + 60;
 
-    const nodes = equipment.map((eq) => {
+    const nodes = equipmentWithLiveData.map((eq) => {
       const pos = positions[eq.id];
       const startX = (totalWidth - numColumns * COLUMN_WIDTH) / 2;
-
       const x =
         startX + pos.column * COLUMN_WIDTH + (COLUMN_WIDTH - NODE_WIDTH) / 2;
       const y = equipmentStartY + pos.row * ROW_HEIGHT;
-
-      return {
-        equipment: eq,
-        x,
-        y,
-        column: pos.column,
-        row: pos.row,
-      };
+      return { equipment: eq, x, y, column: pos.column, row: pos.row };
     });
 
     const connections = nodes.map((node) => {
@@ -220,12 +265,7 @@ export default function SLDScreen({ navigation }) {
       const busY = startY + BUS_OFFSET;
       const endX = node.x + NODE_WIDTH / 2;
       const endY = node.y;
-
-      let color = "#9CA3AF";
-      const status = node.equipment.status?.status;
-      if (status === "OPERATIONAL") color = "#10B981";
-      if (status === "IN_USE" || status === "IN_CLASS") color = "#3B82F6";
-
+      const color = node.equipment.isAlive ? "#10B981" : "#9CA3AF";
       return { startX, startY, busY, endX, endY, color };
     });
 
@@ -237,16 +277,12 @@ export default function SLDScreen({ navigation }) {
       totalWidth,
       totalHeight: equipmentStartY + (maxRow + 1) * ROW_HEIGHT + 100,
     };
-  }, [equipment, equipmentPositions, numColumns]);
+  }, [equipmentWithLiveData, equipmentPositions, numColumns]);
 
   const getSmoothPath = (x1, y1, busY, x2, y2) => {
-    const r = 12;
+    const r = 10;
     const xDir = x2 > x1 ? 1 : -1;
-
-    if (Math.abs(x1 - x2) < 1) {
-      return `M ${x1} ${y1} L ${x2} ${y2}`;
-    }
-
+    if (Math.abs(x1 - x2) < 1) return `M ${x1} ${y1} L ${x2} ${y2}`;
     return `
       M ${x1} ${y1}
       L ${x1} ${busY - r}
@@ -257,7 +293,6 @@ export default function SLDScreen({ navigation }) {
     `;
   };
 
-  // --- Render Helpers ---
   const handleApplyPosition = () => {
     if (editingNodeId) {
       setEquipmentPositions((prev) => ({
@@ -277,13 +312,34 @@ export default function SLDScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>System Diagram</Text>
+            <View
+              style={[
+                styles.liveBadge,
+                isSocketConnected ? styles.bgGreen : styles.bgGray,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={isSocketConnected ? "wifi" : "wifi-off"}
+                size={12}
+                color={isSocketConnected ? "#15803d" : "#4b5563"}
+              />
+              <Text
+                style={[
+                  styles.liveText,
+                  isSocketConnected
+                    ? { color: "#15803d" }
+                    : { color: "#4b5563" },
+                ]}
+              >
+                {isSocketConnected ? "Live" : "Offline"}
+              </Text>
+            </View>
           </View>
-
           <View style={styles.headerRight}>
             {isLabManager &&
               selectedLabId &&
@@ -315,7 +371,7 @@ export default function SLDScreen({ navigation }) {
         </View>
       </View>
 
-      {/* --- LAB SELECTOR (DROPDOWN) --- */}
+      {/* LAB SELECTOR */}
       <View style={styles.filterContainer}>
         <Menu
           visible={labMenuVisible}
@@ -355,10 +411,10 @@ export default function SLDScreen({ navigation }) {
         </Menu>
       </View>
 
-      {/* --- EDIT CONTROLS --- */}
+      {/* EDIT CONTROLS */}
       {isEditMode && (
         <View style={styles.editControls}>
-          <Text style={styles.editLabel}>Grid Columns: {numColumns}</Text>
+          <Text style={styles.editLabel}>Columns: {numColumns}</Text>
           <View style={{ flexDirection: "row", gap: 8 }}>
             <IconButton
               icon="minus"
@@ -381,149 +437,126 @@ export default function SLDScreen({ navigation }) {
               }}
             />
           </View>
-          {hasUnsavedChanges && (
-            <Text
-              style={{ color: "#D97706", fontSize: 11, fontWeight: "bold" }}
-            >
-              Unsaved Changes
+        </View>
+      )}
+
+      {/* CANVAS */}
+      <View style={styles.canvasContainer}>
+        {/* STICKY TOTAL COUNT BADGE */}
+        {selectedLabId && equipmentWithLiveData.length > 0 && (
+          <View style={styles.stickyCounter}>
+            <MaterialCommunityIcons name="collage" size={14} color="#6B7280" />
+            <Text style={styles.stickyCounterText}>
+              Total: {equipmentWithLiveData.length}
             </Text>
-          )}
-        </View>
-      )}
-
-      {/* --- STATUS LEGEND --- */}
-      {selectedLabId && !loading && (
-        <View style={styles.legendContainer}>
-          <Text style={styles.legendTitle}>Status Legend</Text>
-          <View style={styles.legendItems}>
-            {STATUS_LEGEND.map((status) => (
-              <View key={status.label} style={styles.legendItem}>
-                <View
-                  style={[styles.legendDot, { backgroundColor: status.color }]}
-                />
-                <Text style={styles.legendText}>{status.label}</Text>
-              </View>
-            ))}
           </View>
-        </View>
-      )}
+        )}
 
-      {/* --- CANVAS AREA --- */}
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2563EB" />
-          <Text style={{ marginTop: 10 }}>Loading Diagram...</Text>
-        </View>
-      ) : !selectedLabId ? (
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconBox}>
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#2563EB" />
+          </View>
+        ) : !selectedLabId ? (
+          <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="sitemap" size={48} color="#9CA3AF" />
+            <Text style={styles.emptyText}>Select a lab to view diagram</Text>
           </View>
-          <Text style={styles.emptyText}>Select a lab to view diagram</Text>
-          <Text style={styles.emptySubText}>
-            Choose a lab from the list above
-          </Text>
-        </View>
-      ) : (
-        <ScrollView
-          horizontal
-          contentContainerStyle={{ flexGrow: 1 }}
-          style={styles.canvasContainer}
-        >
-          <ScrollView
-            contentContainerStyle={{
-              minWidth: layout.totalWidth,
-              minHeight: layout.totalHeight,
-              paddingBottom: 50,
-            }}
-          >
-            <View
-              style={{ width: layout.totalWidth, height: layout.totalHeight }}
+        ) : (
+          <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
+            <ScrollView
+              contentContainerStyle={{
+                minWidth: layout.totalWidth,
+                minHeight: layout.totalHeight,
+                paddingBottom: 50,
+              }}
             >
-              <Svg
-                height={layout.totalHeight}
-                width={layout.totalWidth}
-                style={StyleSheet.absoluteFill}
-              >
-                <Defs>
-                  <Marker
-                    id="arrow"
-                    viewBox="0 0 10 10"
-                    refX="5"
-                    refY="5"
-                    markerWidth="4"
-                    markerHeight="4"
-                    orient="auto-start-reverse"
-                  >
-                    <Path d="M 0 0 L 10 5 L 0 10 z" fill="#9CA3AF" />
-                  </Marker>
-                </Defs>
-                {layout.connections.map((conn, i) => (
-                  <React.Fragment key={i}>
-                    <Path
-                      d={getSmoothPath(
-                        conn.startX,
-                        conn.startY,
-                        conn.busY,
-                        conn.endX,
-                        conn.endY
-                      )}
-                      stroke={conn.color}
-                      strokeWidth="2"
-                      fill="none"
-                    />
-                    <Circle
-                      cx={conn.startX}
-                      cy={conn.startY}
-                      r="4"
-                      fill={conn.color}
-                    />
-                  </React.Fragment>
-                ))}
-              </Svg>
-
               <View
-                style={[
-                  styles.rootNode,
-                  {
-                    left: layout.rootX,
-                    top: layout.rootY,
-                    width: ROOT_WIDTH,
-                    height: ROOT_HEIGHT,
-                  },
-                ]}
+                style={{ width: layout.totalWidth, height: layout.totalHeight }}
               >
-                <MaterialCommunityIcons name="domain" size={24} color="white" />
-                <View style={{ marginLeft: 10, flex: 1 }}>
+                <Svg
+                  height={layout.totalHeight}
+                  width={layout.totalWidth}
+                  style={StyleSheet.absoluteFill}
+                >
+                  <Defs>
+                    <Marker
+                      id="arrow"
+                      viewBox="0 0 10 10"
+                      refX="5"
+                      refY="5"
+                      markerWidth="4"
+                      markerHeight="4"
+                      orient="auto-start-reverse"
+                    >
+                      <Path d="M 0 0 L 10 5 L 0 10 z" fill="#9CA3AF" />
+                    </Marker>
+                  </Defs>
+                  {layout.connections.map((conn, i) => (
+                    <React.Fragment key={i}>
+                      <Path
+                        d={getSmoothPath(
+                          conn.startX,
+                          conn.startY,
+                          conn.busY,
+                          conn.endX,
+                          conn.endY
+                        )}
+                        stroke={conn.color}
+                        strokeWidth="2"
+                        fill="none"
+                      />
+                      <Circle
+                        cx={conn.startX}
+                        cy={conn.startY}
+                        r="3"
+                        fill={conn.color}
+                      />
+                    </React.Fragment>
+                  ))}
+                </Svg>
+
+                {/* ROOT NODE WITH GRADIENT */}
+                <LinearGradient
+                  colors={["#6B7280", "#4B5563"]} // gray-500 to gray-600
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[
+                    styles.rootNode,
+                    {
+                      left: layout.rootX,
+                      top: layout.rootY,
+                      width: ROOT_WIDTH,
+                      height: ROOT_HEIGHT,
+                    },
+                  ]}
+                >
                   <Text style={styles.rootTitle} numberOfLines={1}>
-                    {labs.find((l) => l.labId === selectedLabId)?.name ||
-                      "Main Supply"}
+                    {getLabNameOnly(
+                      labs.find((l) => l.labId === selectedLabId)?.name
+                    )}
                   </Text>
-                  <Text style={styles.rootSubtitle}>
-                    {equipment.length} Machines Connected
-                  </Text>
-                </View>
+                </LinearGradient>
+
+                {layout.nodes.map((node) => (
+                  <EquipmentNode
+                    key={node.equipment.id}
+                    node={node}
+                    isEditMode={isEditMode}
+                    onPositionPress={(n) => {
+                      setEditingNodeId(n.equipment.id);
+                      setTempPos({ col: n.column, row: n.row });
+                      setPositionModalVisible(true);
+                    }}
+                    onNodePress={handleNodePress}
+                  />
+                ))}
               </View>
-
-              {layout.nodes.map((node) => (
-                <EquipmentNode
-                  key={node.equipment.id}
-                  node={node}
-                  isEditMode={isEditMode}
-                  onPositionPress={(n) => {
-                    setEditingNodeId(n.equipment.id);
-                    setTempPos({ col: n.column, row: n.row });
-                    setPositionModalVisible(true);
-                  }}
-                  onNodePress={handleNodePress}
-                />
-              ))}
-            </View>
+            </ScrollView>
           </ScrollView>
-        </ScrollView>
-      )}
+        )}
+      </View>
 
-      {/* --- MODALS --- */}
+      {/* MODALS */}
       <Portal>
         <Dialog
           visible={detailsVisible}
@@ -536,55 +569,31 @@ export default function SLDScreen({ navigation }) {
               <Text>{selectedNode?.equipmentId}</Text>
             </View>
             <View style={styles.modalRow}>
-              <Text style={styles.modalLabel}>Model:</Text>
-              <Text>{selectedNode?.model || "N/A"}</Text>
+              <Text style={styles.modalLabel}>Energy:</Text>
+              <Text>
+                {selectedNode?.status?.energyConsumption?.toFixed(2) || 0} kW
+              </Text>
             </View>
             <View style={styles.modalRow}>
-              <Text style={styles.modalLabel}>Manufacturer:</Text>
-              <Text>{selectedNode?.manufacturer || "N/A"}</Text>
-            </View>
-            <View style={[styles.modalRow, { marginTop: 10 }]}>
               <Text style={styles.modalLabel}>Status:</Text>
-              <Chip style={{ height: 30 }} textStyle={{ fontSize: 12 }}>
-                {selectedNode?.status?.status || "IDLE"}
-              </Chip>
-            </View>
-            <View style={[styles.modalRow, { marginTop: 10 }]}>
-              <Text style={styles.modalLabel}>Health Score:</Text>
-              <Text style={{ fontWeight: "bold", color: "#059669" }}>
-                {selectedNode?.status?.healthScore?.toFixed(1)}%
-              </Text>
+              <Chip>{selectedNode?.isAlive ? "Online" : "Offline"}</Chip>
             </View>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button
-              onPress={() => {
-                setDetailsVisible(false);
-                navigation.navigate("EquipmentDetails", {
-                  equipmentId: selectedNode?.id,
-                });
-              }}
-            >
-              Full Details
-            </Button>
             <Button onPress={() => setDetailsVisible(false)}>Close</Button>
           </Dialog.Actions>
         </Dialog>
-      </Portal>
 
-      <Portal>
         <Dialog
           visible={positionModalVisible}
           onDismiss={() => setPositionModalVisible(false)}
         >
           <Dialog.Title>Move Equipment</Dialog.Title>
           <Dialog.Content>
-            <Text style={{ marginBottom: 10 }}>
-              Enter new coordinates grid position:
-            </Text>
+            <Text style={{ marginBottom: 10 }}>Coordinates:</Text>
             <View style={{ flexDirection: "row", gap: 10 }}>
               <View style={{ flex: 1 }}>
-                <Text>Column (0-{numColumns - 1})</Text>
+                <Text>Column</Text>
                 <TextInput
                   mode="outlined"
                   keyboardType="numeric"
@@ -624,27 +633,6 @@ export default function SLDScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#E5E7EB" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-
-  // Dropdown
-  dropdownTrigger: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  dropdownText: {
-    fontSize: 14,
-    color: "#374151",
-    fontWeight: "500",
-    flex: 1,
-  },
-
-  // Header Fixed
   headerWrapper: {
     backgroundColor: "white",
     borderBottomWidth: 1,
@@ -658,76 +646,57 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  headerLeft: {
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerTitle: { fontSize: 20, fontWeight: "bold", color: "#111827" },
+  liveBadge: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    gap: 4,
+    borderWidth: 1,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#111827",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  actionButtons: {
-    flexDirection: "row",
-  },
-
-  // Lab Selector
+  bgGreen: { backgroundColor: "#dcfce7", borderColor: "#bbf7d0" },
+  bgGray: { backgroundColor: "#f3f4f6", borderColor: "#e5e7eb" },
+  liveText: { fontSize: 10, fontWeight: "700" },
+  headerRight: { flexDirection: "row", alignItems: "center" },
+  actionButtons: { flexDirection: "row" },
   filterContainer: {
     backgroundColor: "white",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
-    zIndex: 5, // Important for Menu
+    zIndex: 5,
   },
-
-  // Legend
-  legendContainer: {
-    backgroundColor: "white",
-    padding: 10,
-    marginHorizontal: 10,
-    marginTop: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  legendTitle: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#374151",
-    marginBottom: 6,
-  },
-  legendItems: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  legendItem: {
+  dropdownTrigger: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  dropdownText: { fontSize: 14, color: "#374151", fontWeight: "500", flex: 1 },
+  editControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    backgroundColor: "#EFF6FF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#DBEAFE",
   },
-  legendText: {
-    fontSize: 12,
-    color: "#6B7280",
-  },
-
-  // Content Area
+  editLabel: { fontSize: 14, fontWeight: "600", color: "#1E40AF" },
   canvasContainer: {
     flex: 1,
     backgroundColor: "#F3F4F6",
+    position: "relative",
   },
-
-  // Empty State
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -741,48 +710,46 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     marginBottom: 16,
   },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#374151",
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginTop: 4,
-  },
-
-  // Edit Controls
-  editControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 12,
-    backgroundColor: "#EFF6FF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#DBEAFE",
-  },
-  editLabel: { fontSize: 14, fontWeight: "600", color: "#1E40AF" },
-
-  // Diagram Elements
+  emptyText: { fontSize: 16, fontWeight: "bold", color: "#374151" },
+  // UPDATED ROOT NODE STYLE
   rootNode: {
     position: "absolute",
-    backgroundColor: "#2563EB",
-    borderRadius: 8,
-    flexDirection: "row",
+    borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
-    padding: 10,
+    paddingHorizontal: 16,
     shadowColor: "#000",
     shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowRadius: 3,
+    elevation: 4,
     zIndex: 20,
   },
-  rootTitle: { color: "white", fontWeight: "bold", fontSize: 14 },
-  rootSubtitle: { color: "#DBEAFE", fontSize: 10 },
-
-  // Modal
+  rootTitle: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  stickyCounter: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    zIndex: 100,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  stickyCounterText: { fontSize: 12, fontWeight: "600", color: "#374151" },
   modalRow: {
     flexDirection: "row",
     justifyContent: "space-between",

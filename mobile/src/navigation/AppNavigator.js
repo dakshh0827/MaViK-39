@@ -5,12 +5,13 @@ import { useAuthStore } from "../context/useAuthStore";
 // Screens
 import LoginScreen from "../screens/auth/LoginScreen";
 import SignupScreen from "../screens/auth/SignupScreen";
-import VerifyEmailScreen from "../screens/auth/VerifyEmailScreen"; // <--- New Screen
+import VerifyEmailScreen from "../screens/auth/VerifyEmailScreen";
 import MainTabNavigator from "./MainTabNavigator";
 import EquipmentDetailsScreen from "../screens/equipment/EquipmentDetailsScreen";
 import EquipmentListScreen from "../screens/equipment/EquipmentListScreen";
 import QRScannerScreen from "../screens/equipment/QRScannerScreen";
 import ChatbotScreen from "../screens/ai/ChatbotScreen";
+import LabAnalyticsScreen from "../screens/dashboard/LabAnalyticsScreen"; // <--- IMPORT THIS
 
 const Stack = createNativeStackNavigator();
 
@@ -41,6 +42,15 @@ export default function AppNavigator() {
             component={EquipmentDetailsScreen}
             options={{ headerShown: true, title: "Machine Details" }}
           />
+
+          {/* --- ADD THIS SCREEN --- */}
+          <Stack.Screen
+            name="LabAnalytics"
+            component={LabAnalyticsScreen}
+            options={{ headerShown: false }} // We built a custom header in the screen
+          />
+          {/* ----------------------- */}
+
           <Stack.Screen
             name="QRScanner"
             component={QRScannerScreen}

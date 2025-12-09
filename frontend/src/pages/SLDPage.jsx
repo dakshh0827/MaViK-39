@@ -47,7 +47,7 @@ const NODE_HEIGHT = 46;
 const COLUMN_WIDTH = 260;
 const ROW_HEIGHT = 100;
 const ROOT_WIDTH = 280;
-const ROOT_HEIGHT = 80;
+const ROOT_HEIGHT = 150;
 const CANVAS_PADDING = 50;
 const BUS_OFFSET = 60;
 
@@ -97,7 +97,7 @@ export default function SLDPage() {
   const [socket, setSocket] = useState(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [liveEquipmentData, setLiveEquipmentData] = useState({});
-  
+
   // Time state for "Alive" check
   const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -193,13 +193,14 @@ export default function SLDPage() {
 
     return equipment.map((eq) => {
       const liveData = liveEquipmentData[eq.id];
-      
+
       // Determine Alive Status
       let isAlive = false;
       if (liveData && liveData.updatedAt) {
         const lastUpdate = new Date(liveData.updatedAt).getTime();
-        if (currentTime - lastUpdate < 30000) { // 30 Seconds Threshold
-             isAlive = true;
+        if (currentTime - lastUpdate < 30000) {
+          // 30 Seconds Threshold
+          isAlive = true;
         }
       }
 

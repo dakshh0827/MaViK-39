@@ -396,17 +396,6 @@ export default function DashboardLayout() {
             {user?.role?.replace("_", " ")}
           </span>
 
-          {/* ADDED: NQR Portal Button */}
-          <a
-            href="https://nqr.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-5 py-2.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
-            title="National Qualification Register"
-          >
-            <span>NQR</span>
-          </a>
-
           <button
             onClick={handleLogout}
             className="p-2 rounded-md text-gray-600 hover:bg-gray-100"

@@ -28,7 +28,8 @@ import {
   TrendingUp,
   TrendingDown,
   Activity,
-  Clock,
+  ExternalLink,
+  BookOpen, // New Icon
 } from "lucide-react";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import api from "../../lib/axios";
@@ -54,12 +55,71 @@ const FALLBACK_COLORS = [
   "#06B6D4",
 ];
 
+// --- QUALIFICATION DATA DATABASE ---
+// Keys are simplified to single words to ensure they match your equipment names better.
+const QUALIFICATION_DB = {
+  lathe: {
+    title: "CNC Lathe Operator",
+    url: "https://nqr.gov.in/qualifications/11405",
+    stats: {
+      Theory: 40,
+      Practical: 80,
+      EmployabilitySkills: "00",
+      "OJT(Mandatory)": "00",
+    },
+  },
+  drill: {
+    title: "Bench Drill Operator",
+    url: "https://nqr.gov.in/qualifications/12082",
+    stats: {
+      Theory: 60,
+      Practical: 150,
+      EmployabilitySkills: 30,
+      "OJT(Mandatory)": 150,
+    },
+  },
+  weld: {
+    title: "Arc Welding Specialist",
+    url: "https://nqr.gov.in/qualifications/14234",
+    stats: {
+      Theory: 120,
+      Practical: 180,
+      EmployabilitySkills: 30,
+      "OJT(Mandatory)": 60,
+    },
+  },
+  laser: {
+    title: "Laser Engraver",
+    url: "https://nqr.gov.in/qualifications/13977",
+    stats: {
+      Theory: 150,
+      Practical: 180,
+      EmployabilitySkills: 60,
+      "OJT(Mandatory)": 180,
+    },
+  },
+};
+
+// Helper to find qualification data based on equipment name
+const getQualificationData = (name) => {
+  if (!name) return null;
+  const lowerName = name.toLowerCase();
+
+  // Debug log to help you see what names are being checked in Console
+  // console.log("Checking equipment name:", lowerName);
+
+  for (const [key, data] of Object.entries(QUALIFICATION_DB)) {
+    if (lowerName.includes(key)) return data;
+  }
+  return null;
+};
+
 // --- HELPER: Date + Time ---
 const formatTimestamp = (isoString) => {
   if (!isoString) return "N/A";
   const date = new Date(isoString);
   if (isNaN(date.getTime())) return "Invalid Date";
-  
+
   return date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -84,7 +144,12 @@ const getISOStandard = (department) => {
 
 const PredictiveMaintenanceCard = ({ equipment, prediction }) => {
   if (!prediction) return null;
-  const probability = prediction.probability || 0;
+
+  // FIX: Handle percentage calculation safely inside variable
+  let rawProb = prediction.probability || 0;
+  // If probability is decimal (0.85), convert to 85. If already 85, keep it.
+  const probability = rawProb <= 1 ? rawProb * 100 : rawProb;
+
   const daysUntil = prediction.daysUntilMaintenance || 0;
   const needsMaintenance = prediction.prediction === 1;
 
@@ -158,8 +223,6 @@ export default function LabAnalyticsPage() {
 
   // --- SOCKET.IO CONNECTION ---
   useEffect(() => {
-    console.log("🔌 Setting up Socket.IO connection...");
-
     let token = null;
     try {
       const authStorage = localStorage.getItem("auth-storage");
@@ -171,10 +234,7 @@ export default function LabAnalyticsPage() {
       console.error("❌ Failed to parse auth token:", e);
     }
 
-    if (!token) {
-      console.error("❌ No access token found in localStorage");
-      return;
-    }
+    if (!token) return;
 
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
     const socketUrl = apiUrl.replace("/api", "");
@@ -188,17 +248,14 @@ export default function LabAnalyticsPage() {
     });
 
     socketInstance.on("connect", () => {
-      console.log("✅ Socket.IO connected!", socketInstance.id);
       setIsSocketConnected(true);
     });
 
-    socketInstance.on("disconnect", (reason) => {
-      console.log("❌ Socket.IO disconnected:", reason);
+    socketInstance.on("disconnect", () => {
       setIsSocketConnected(false);
     });
 
-    socketInstance.on("connect_error", (error) => {
-      console.error("❌ Socket.IO connection error:", error.message);
+    socketInstance.on("connect_error", () => {
       setIsSocketConnected(false);
     });
 
@@ -213,7 +270,6 @@ export default function LabAnalyticsPage() {
     setSocket(socketInstance);
 
     return () => {
-      console.log("🔌 Cleaning up Socket.IO connection");
       socketInstance.removeAllListeners();
       socketInstance.disconnect();
     };
@@ -225,10 +281,7 @@ export default function LabAnalyticsPage() {
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
 
-    if (!equipmentId) {
-      console.warn("⚠️ No equipmentId in update data", data);
-      return;
-    }
+    if (!equipmentId) return;
 
     // 1. Update Live Indicator State
     setLiveUpdates((prev) => ({
@@ -240,8 +293,8 @@ export default function LabAnalyticsPage() {
         efficiency: data.efficiency,
         status: data.status,
         energyConsumption: data.energyConsumption,
-        timestamp: data.readingTimestamp || new Date().toISOString(), 
-        updatedAt: new Date(), 
+        timestamp: data.readingTimestamp || new Date().toISOString(),
+        updatedAt: new Date(),
       },
     }));
 
@@ -257,14 +310,15 @@ export default function LabAnalyticsPage() {
               ...eq.status,
               status: data.status || eq.status?.status,
               healthScore: data.healthScore ?? eq.status?.healthScore,
-              lastUsedAt: data.readingTimestamp || new Date().toISOString()
+              lastUsedAt: data.readingTimestamp || new Date().toISOString(),
             },
             analyticsParams: {
               ...eq.analyticsParams,
               temperature: data.temperature ?? eq.analyticsParams?.temperature,
               vibration: data.vibration ?? eq.analyticsParams?.vibration, // UPDATE VIBRATION
               efficiency: data.efficiency ?? eq.analyticsParams?.efficiency,
-              energyConsumption: data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
+              energyConsumption:
+                data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
             },
           };
         }
@@ -301,6 +355,7 @@ export default function LabAnalyticsPage() {
         const analyticsResponse = await api.get(
           `/monitoring/lab-analytics/${labId}`
         );
+        console.log("📊 Loaded Lab Data:", analyticsResponse.data.data); // DEBUG LOG
         setLabData(analyticsResponse.data.data);
 
         try {
@@ -329,7 +384,7 @@ export default function LabAnalyticsPage() {
     if (!labData || !labData.equipment) return null;
 
     // 1. Merge liveUpdates into the equipment list
-    const equipment = labData.equipment.map(eq => {
+    const equipment = labData.equipment.map((eq) => {
       const live = liveUpdates[eq.id];
       if (!live) return eq;
 
@@ -345,8 +400,9 @@ export default function LabAnalyticsPage() {
           temperature: live.temperature ?? eq.analyticsParams?.temperature,
           vibration: live.vibration ?? eq.analyticsParams?.vibration,
           efficiency: live.efficiency ?? eq.analyticsParams?.efficiency,
-          energyConsumption: live.energyConsumption ?? eq.analyticsParams?.energyConsumption,
-        }
+          energyConsumption:
+            live.energyConsumption ?? eq.analyticsParams?.energyConsumption,
+        },
       };
     });
 
@@ -403,7 +459,23 @@ export default function LabAnalyticsPage() {
       vibrationData,
       energyData,
     };
-  }, [labData, liveUpdates]); // liveUpdates dependency ensures charts re-render
+  }, [labData, liveUpdates]);
+
+  // --- CALCULATE UNIQUE QUALIFICATIONS ---
+  const uniqueQualifications = useMemo(() => {
+    if (!labData?.equipment) return [];
+    const foundUrls = new Set();
+    const qualifications = [];
+
+    labData.equipment.forEach((eq) => {
+      const data = getQualificationData(eq.name);
+      if (data && !foundUrls.has(data.url)) {
+        foundUrls.add(data.url);
+        qualifications.push(data);
+      }
+    });
+    return qualifications;
+  }, [labData]);
 
   // --- CALCULATE AVERAGE AI CONFIDENCE ---
   const avgAiConfidence = useMemo(() => {
@@ -412,12 +484,29 @@ export default function LabAnalyticsPage() {
       (sum, item) => sum + (item.prediction?.probability || 0),
       0
     );
-    return (totalConfidence / predictiveData.length).toFixed(1);
+    const avg = totalConfidence / predictiveData.length;
+    // Normalize safely to 0-100
+    return (avg <= 1 ? avg * 100 : avg).toFixed(1);
   }, [predictiveData]);
 
-  if (isLoading) return <div className="flex items-center justify-center min-h-screen bg-gray-50"><LoadingSpinner size="lg" /></div>;
-  if (error) return <div className="flex items-center justify-center min-h-screen bg-gray-200"><p className="text-red-500">{error}</p></div>;
-  if (!labData) return <div className="flex items-center justify-center min-h-screen bg-gray-50"><p className="text-gray-600">No data available.</p></div>;
+  if (isLoading)
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  if (error)
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-200">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  if (!labData)
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <p className="text-gray-600">No data available.</p>
+      </div>
+    );
 
   const isoStandard = getISOStandard(labData.lab?.department);
   const stats = labData.statistics || {};
@@ -428,7 +517,10 @@ export default function LabAnalyticsPage() {
       <div className="bg-white border-b border-gray-200 px-6 py-5 sticky top-0 z-10 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/dashboard")} className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-900">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-900"
+            >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
@@ -468,11 +560,33 @@ export default function LabAnalyticsPage() {
       <div className="flex-1 w-full p-6 space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <StatCard icon={Box} title="Total Equipment" value={stats.totalEquipment || 0} />
-          <StatCard icon={ShieldCheck} title="Avg Health" value={`${(stats.avgHealthScore || 0).toFixed(0)}%`} color="text-green-600" />
-          <StatCard icon={TrendingUp} title="Total Uptime" value={`${(stats.totalUptime || 0).toFixed(0)}h`} />
-          <StatCard icon={TrendingDown} title="Downtime" value={`${(stats.totalDowntime || 0).toFixed(0)}h`} />
-          <StatCard icon={Activity} title="Avg AI Confidence" value={`${avgAiConfidence}%`} color="text-purple-600" />
+          <StatCard
+            icon={Box}
+            title="Total Equipment"
+            value={stats.totalEquipment || 0}
+          />
+          <StatCard
+            icon={ShieldCheck}
+            title="Avg Health"
+            value={`${(stats.avgHealthScore || 0).toFixed(0)}%`}
+            color="text-green-600"
+          />
+          <StatCard
+            icon={TrendingUp}
+            title="Total Uptime"
+            value={`${(stats.totalUptime || 0).toFixed(0)}h`}
+          />
+          <StatCard
+            icon={TrendingDown}
+            title="Downtime"
+            value={`${(stats.totalDowntime || 0).toFixed(0)}h`}
+          />
+          <StatCard
+            icon={Activity}
+            title="Avg AI Confidence"
+            value={`${avgAiConfidence}%`}
+            color="text-purple-600"
+          />
         </div>
 
         {/* Predictive Maintenance */}
@@ -498,7 +612,9 @@ export default function LabAnalyticsPage() {
                 {predictiveData.map((item) => (
                   <PredictiveMaintenanceCard
                     key={item.id}
-                    equipment={labData.equipment?.find((eq) => eq.id === item.id)}
+                    equipment={labData.equipment?.find(
+                      (eq) => eq.id === item.id
+                    )}
                     prediction={item.prediction}
                   />
                 ))}
@@ -531,7 +647,13 @@ export default function LabAnalyticsPage() {
                       }
                     >
                       {chartData.statusChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.rawStatus] || FALLBACK_COLORS[index]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={
+                            STATUS_COLORS[entry.rawStatus] ||
+                            FALLBACK_COLORS[index]
+                          }
+                        />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -544,7 +666,8 @@ export default function LabAnalyticsPage() {
             {/* Health Chart */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2 flex flex-col">
               <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <BarChart3 className="text-green-500 w-5 h-5" /> Health & Efficiency (Real-time)
+                <BarChart3 className="text-green-500 w-5 h-5" /> Health &
+                Efficiency (Real-time)
               </h3>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -552,12 +675,30 @@ export default function LabAnalyticsPage() {
                     data={chartData.healthScoreData}
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis dataKey="shortName" angle={-20} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f0f0f0"
+                    />
+                    <XAxis
+                      dataKey="shortName"
+                      angle={-20}
+                      textAnchor="end"
+                      height={60}
+                      tick={{ fontSize: 11 }}
+                    />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar dataKey="healthScore" fill="#10B981" name="Health Score" />
-                    <Bar dataKey="efficiency" fill="#3B82F6" name="Efficiency %" />
+                    <Bar
+                      dataKey="healthScore"
+                      fill="#10B981"
+                      name="Health Score"
+                    />
+                    <Bar
+                      dataKey="efficiency"
+                      fill="#3B82F6"
+                      name="Efficiency %"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -568,12 +709,27 @@ export default function LabAnalyticsPage() {
         {/* Sensor Charts */}
         {chartData && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <ChartCard title="Temperature (°C)" data={chartData.tempData} dataKey="temperature" color="#F59E0B" />
+            <ChartCard
+              title="Temperature (°C)"
+              data={chartData.tempData}
+              dataKey="temperature"
+              color="#F59E0B"
+            />
             {chartData.vibrationData.length > 0 && (
-                <ChartCard title="Vibration (mm/s)" data={chartData.vibrationData} dataKey="vibration" color="#8B5CF6" />
+              <ChartCard
+                title="Vibration (mm/s)"
+                data={chartData.vibrationData}
+                dataKey="vibration"
+                color="#8B5CF6"
+              />
             )}
             {chartData.energyData.length > 0 && (
-                <ChartCard title="Energy (W)" data={chartData.energyData} dataKey="energy" color="#10B981" />
+              <ChartCard
+                title="Energy (W)"
+                data={chartData.energyData}
+                dataKey="energy"
+                color="#10B981"
+              />
             )}
           </div>
         )}
@@ -582,7 +738,9 @@ export default function LabAnalyticsPage() {
         {labData.equipment && labData.equipment.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">Equipment Detail View (Real-time Metrics)</h3>
+              <h3 className="font-bold text-gray-900">
+                Equipment Detail View (Real-time Metrics)
+              </h3>
               {Object.keys(liveUpdates).length > 0 && (
                 <span className="text-xs text-green-600 flex items-center gap-1 font-bold animate-pulse">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -594,76 +752,209 @@ export default function LabAnalyticsPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Equipment</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Health</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Efficiency</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Temp</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Vib</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Energy</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">Last Updated</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Equipment
+                    </th>
+                    {/* ADDED COLUMN: Qualification */}
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Qualification
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Health
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Efficiency
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Temp
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Vib
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Energy
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Last Updated
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {labData.equipment.map((eq) => {
                     const live = liveUpdates[eq.id];
-                    const isFresh = live && (new Date() - live.updatedAt < 5000);
-                    const displayTime = live?.timestamp || eq.status?.lastUsedAt;
+                    const isFresh = live && new Date() - live.updatedAt < 5000;
+                    const displayTime =
+                      live?.timestamp || eq.status?.lastUsedAt;
+
+                    // CHECK FOR QUALIFICATION DATA
+                    const qualification = getQualificationData(eq.name);
 
                     return (
-                      <tr key={eq.id} className={`hover:bg-gray-50 transition-colors duration-500 ${isFresh ? "bg-green-50" : ""}`}>
+                      <tr
+                        key={eq.id}
+                        className={`hover:bg-gray-50 transition-colors duration-500 ${
+                          isFresh ? "bg-green-50" : ""
+                        }`}
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">{eq.name}</span>
+                            <span className="text-sm font-medium text-gray-900">
+                              {eq.name}
+                            </span>
                             {live && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
                             )}
                           </div>
                         </td>
+
+                        {/* NEW CELL: Qualification Link */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {qualification ? (
+                            <a
+                              href={qualification.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              View NQR
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          )}
+                        </td>
+
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
-                             className={`px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full text-white`}
-                             style={{ backgroundColor: STATUS_COLORS[live?.status || eq.status?.status] || STATUS_COLORS.OFFLINE }}
+                            className={`px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full text-white`}
+                            style={{
+                              backgroundColor:
+                                STATUS_COLORS[
+                                  live?.status || eq.status?.status
+                                ] || STATUS_COLORS.OFFLINE,
+                            }}
                           >
                             {live?.status || eq.status?.status || "OFFLINE"}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                           <span className={isFresh ? "font-bold text-green-700" : ""}>
-                                {(live?.healthScore ?? eq.status?.healthScore ?? 0).toFixed(0)}%
-                            </span>
+                          <span
+                            className={
+                              isFresh ? "font-bold text-green-700" : ""
+                            }
+                          >
+                            {(
+                              live?.healthScore ??
+                              eq.status?.healthScore ??
+                              0
+                            ).toFixed(0)}
+                            %
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                           <span className={isFresh ? "font-bold text-green-700" : ""}>
-                                {(live?.efficiency ?? eq.analyticsParams?.efficiency ?? 0).toFixed(0)}%
-                            </span>
+                          <span
+                            className={
+                              isFresh ? "font-bold text-green-700" : ""
+                            }
+                          >
+                            {(
+                              live?.efficiency ??
+                              eq.analyticsParams?.efficiency ??
+                              0
+                            ).toFixed(0)}
+                            %
+                          </span>
                         </td>
-                        
+
                         {/* TEMPERATURE CELL */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <span className={isFresh ? "font-bold text-green-700" : ""}>
-                            {(live?.temperature ?? eq.analyticsParams?.temperature)?.toFixed(1) ?? "N/A"}°C
+                          <span
+                            className={
+                              isFresh ? "font-bold text-green-700" : ""
+                            }
+                          >
+                            {(
+                              live?.temperature ??
+                              eq.analyticsParams?.temperature
+                            )?.toFixed(1) ?? "N/A"}
+                            °C
                           </span>
                         </td>
 
                         {/* VIBRATION CELL - UPDATED */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                           <span className={isFresh ? "font-bold text-green-700" : ""}>
-                            {(live?.vibration ?? eq.analyticsParams?.vibration)?.toFixed(2) ?? "-"}
-                           </span>
+                          <span
+                            className={
+                              isFresh ? "font-bold text-green-700" : ""
+                            }
+                          >
+                            {(
+                              live?.vibration ?? eq.analyticsParams?.vibration
+                            )?.toFixed(2) ?? "-"}
+                          </span>
                         </td>
 
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                           {eq.analyticsParams?.energyConsumption ? eq.analyticsParams.energyConsumption.toFixed(0) : "-"}
+                          {eq.analyticsParams?.energyConsumption
+                            ? eq.analyticsParams.energyConsumption.toFixed(0)
+                            : "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                           {formatTimestamp(displayTime)}
+                          {formatTimestamp(displayTime)}
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* 🆕 NEW SECTION: Qualification Standards & Data */}
+        {uniqueQualifications.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <BookOpen className="text-indigo-600 w-5 h-5" />
+              Qualification Standards & Curriculum
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              {uniqueQualifications.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="bg-indigo-50/50 rounded-lg border border-indigo-100 p-4"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <h4 className="font-semibold text-gray-900 text-sm">
+                      {item.title}
+                    </h4>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 hover:text-indigo-800"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries(item.stats).map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="flex justify-between items-center text-sm border-b border-indigo-100 last:border-0 py-1"
+                      >
+                        <span className="text-gray-600 font-medium">
+                          {label}
+                        </span>
+                        <span className="text-gray-900 font-bold">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -679,10 +970,14 @@ export default function LabAnalyticsPage() {
 const StatCard = ({ icon: Icon, title, value, color = "text-blue-600" }) => (
   <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
     <div className="flex items-center gap-3 mb-1">
-      <div className={`p-2 bg-blue-50 ${color} rounded-full`}><Icon className="w-4 h-4" /></div>
+      <div className={`p-2 bg-blue-50 ${color} rounded-full`}>
+        <Icon className="w-4 h-4" />
+      </div>
       <span className="text-xl font-bold text-gray-900">{value}</span>
     </div>
-    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">{title}</span>
+    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">
+      {title}
+    </span>
   </div>
 );
 
@@ -694,11 +989,31 @@ const ChartCard = ({ title, data, dataKey, color }) => {
         <Activity className="w-5 h-5" style={{ color }} /> {title}
       </h3>
       <div className="h-[250px] overflow-x-auto overflow-y-hidden custom-scrollbar">
-        <div style={{ width: `${dynamicWidth}%`, minWidth: "100%", height: "100%" }}>
+        <div
+          style={{
+            width: `${dynamicWidth}%`,
+            minWidth: "100%",
+            height: "100%",
+          }}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-              <XAxis dataKey="shortName" angle={-20} textAnchor="end" height={60} tick={{ fontSize: 10 }} interval={0} />
+            <BarChart
+              data={data}
+              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#f0f0f0"
+              />
+              <XAxis
+                dataKey="shortName"
+                angle={-20}
+                textAnchor="end"
+                height={60}
+                tick={{ fontSize: 10 }}
+                interval={0}
+              />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
               <Bar dataKey={dataKey} fill={color} />
