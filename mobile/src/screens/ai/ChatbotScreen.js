@@ -21,19 +21,17 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Import your store
 import { useChatbotStore } from "../../stores/chatbotStore";
+import VoiceInput from "../../components/common/VoiceInput";
 
 export default function ChatbotScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const flatListRef = useRef(null);
 
-  // --- STATE ---
   const [viewMode, setViewMode] = useState("chat");
   const [inputText, setInputText] = useState("");
 
-  // --- STORE HOOKS ---
   const {
     messages,
     sendMessage,
@@ -46,12 +44,10 @@ export default function ChatbotScreen({ navigation }) {
   const [briefingResponse, setBriefingResponse] = useState(null);
   const [isBriefingLoading, setIsBriefingLoading] = useState(false);
 
-  // Init Session on Load
   useEffect(() => {
     initSession();
   }, []);
 
-  // Auto-scroll Chat
   useEffect(() => {
     if (viewMode === "chat" && flatListRef.current) {
       setTimeout(
@@ -61,13 +57,16 @@ export default function ChatbotScreen({ navigation }) {
     }
   }, [messages, viewMode, isChatLoading]);
 
-  // --- HANDLERS ---
   const handleSend = async () => {
     if (!inputText.trim() || isChatLoading) return;
     const text = inputText;
     setInputText("");
     Keyboard.dismiss();
     await sendMessage(text);
+  };
+
+  const handleVoiceTranscription = (text) => {
+    setInputText((prev) => (prev ? `${prev} ${text}` : text));
   };
 
   const handleQuickAction = (action) => {
@@ -96,10 +95,6 @@ export default function ChatbotScreen({ navigation }) {
     setBriefingResponse(null);
   };
 
-  // ==========================================
-  // RENDER HELPERS
-  // ==========================================
-
   const renderMessage = ({ item }) => {
     const isUser = item.role === "user" || item.sender === "user";
     const text = item.content || item.message || item.text || item.response;
@@ -121,7 +116,6 @@ export default function ChatbotScreen({ navigation }) {
           </View>
         )}
 
-        {/* FIXED: Replaced Surface with View to fix "double edge" shadow artifact */}
         <View
           style={[
             styles.bubble,
@@ -131,7 +125,7 @@ export default function ChatbotScreen({ navigation }) {
                   borderTopLeftRadius: 20,
                   borderTopRightRadius: 20,
                   borderBottomLeftRadius: 20,
-                  borderBottomRightRadius: 2, // Sharp corner for user
+                  borderBottomRightRadius: 2,
                 }
               : {
                   backgroundColor: "white",
@@ -140,7 +134,7 @@ export default function ChatbotScreen({ navigation }) {
                   borderTopLeftRadius: 20,
                   borderTopRightRadius: 20,
                   borderBottomRightRadius: 20,
-                  borderBottomLeftRadius: 2, // Sharp corner for AI
+                  borderBottomLeftRadius: 2,
                 },
           ]}
         >
@@ -181,7 +175,6 @@ export default function ChatbotScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-      {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerTop}>
           <IconButton
@@ -223,7 +216,6 @@ export default function ChatbotScreen({ navigation }) {
       </View>
 
       <View style={styles.contentArea}>
-        {/* CHAT VIEW */}
         {viewMode === "chat" && (
           <>
             <FlatList
@@ -280,30 +272,37 @@ export default function ChatbotScreen({ navigation }) {
               behavior={Platform.OS === "ios" ? "padding" : undefined}
             >
               <View style={styles.inputWrapper}>
-                <TextInput
-                  mode="outlined"
-                  placeholder="Type your message..."
-                  value={inputText}
-                  onChangeText={setInputText}
-                  style={styles.textInput}
-                  outlineStyle={{ borderRadius: 24 }}
-                  right={
-                    <TextInput.Icon
-                      icon="send"
-                      color={
-                        inputText.trim() ? theme.colors.primary : "#9CA3AF"
-                      }
-                      disabled={!inputText.trim() || isChatLoading}
-                      onPress={handleSend}
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    mode="outlined"
+                    placeholder="Type your message..."
+                    value={inputText}
+                    onChangeText={setInputText}
+                    style={styles.textInput}
+                    outlineStyle={{ borderRadius: 24, paddingRight: 50 }}
+                    right={
+                      <TextInput.Icon
+                        icon="send"
+                        color={
+                          inputText.trim() ? theme.colors.primary : "#9CA3AF"
+                        }
+                        disabled={!inputText.trim() || isChatLoading}
+                        onPress={handleSend}
+                      />
+                    }
+                  />
+                  <View style={styles.voiceBtnContainer}>
+                    <VoiceInput
+                      onTranscriptionComplete={handleVoiceTranscription}
+                      disabled={isChatLoading}
                     />
-                  }
-                />
+                  </View>
+                </View>
               </View>
             </KeyboardAvoidingView>
           </>
         )}
 
-        {/* BRIEFING VIEW */}
         {viewMode === "briefing" && (
           <View style={styles.briefingContainer}>
             <ScrollView contentContainerStyle={styles.briefingScroll}>
@@ -420,11 +419,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 8,
   },
-  // UPDATED BUBBLE STYLE
   bubble: {
     maxWidth: "75%",
     padding: 12,
-    // Note: Border radii are now handled inline in renderMessage for specificity
   },
   msgText: {
     fontSize: 15,
@@ -448,9 +445,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
   },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   textInput: {
+    flex: 1,
     backgroundColor: "white",
     maxHeight: 100,
+  },
+  voiceBtnContainer: {
+    marginBottom: 4,
   },
   emptyState: {
     flex: 1,
