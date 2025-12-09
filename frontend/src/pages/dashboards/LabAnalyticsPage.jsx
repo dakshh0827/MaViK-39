@@ -207,12 +207,8 @@ const PredictiveMaintenanceCard = ({ equipment, prediction }) => {
   );
 };
 
-const GATEWAY_LOCATION =
-  "Jaipur, Jaipur Municipal Corporation - 302025, Rajasthan, India";
-const GATEWAY_COORDS = {
-  lat: 26.823562,
-  lng: 75.865466,
-};
+// --- LOCATION CONSTANT ---
+const GATEWAY_LOCATION = "Ramnagariya, Jaipur";
 
 // Helper to fetch student name
 const fetchStudentName = async (studentId) => {
@@ -922,57 +918,86 @@ export default function LabAnalyticsPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {labData.equipment.map((eq) => {
                     const live = liveUpdates[eq.id];
-                    const isFresh = live && new Date() - live.updatedAt < 5000;
-                    const displayTime =
-                      live?.timestamp || eq.status?.lastUsedAt;
+                    const isFresh =
+                      live && new Date() - live.updatedAt < 5000;
 
-                    // Determine Lock State
+                    // --- STEP 1: Determine Lock State ---
                     const isLocked =
                       live?.isLocked !== undefined
                         ? live.isLocked
                         : eq.isLocked;
 
-                    // Get current user ID
+                    // --- STEP 2: Logic for Locked vs Unlocked ---
+
+                    // 1. Status: If locked, force "IDLE", otherwise use real status
+                    let rawStatus = isLocked
+                      ? "IDLE"
+                      : live?.status || eq.status?.status || "OFFLINE";
+
+                    const displayStatus = rawStatus
+                      .toUpperCase()
+                      .replace(/_/g, " ");
+
+                    // 2. Timestamp: Hide if locked
+                    const displayTime = isLocked
+                      ? "-"
+                      : formatTimestamp(
+                          live?.timestamp ||
+                            eq.status?.lastUsedAt ||
+                            new Date().toISOString()
+                        );
+
+                    // 3. Gateway: Hide if locked
+                    // If unlocked, show location (or "Not Active" if not transmitting), if locked show "-"
+                    const gateway = isLocked
+                      ? "-"
+                      : live?.temperature !== undefined ||
+                        live?.vibration !== undefined
+                      ? GATEWAY_LOCATION
+                      : "Not Active";
+
+                    // 4. Student Name: Hide if locked
                     const userId =
                       live?.currentUserId !== undefined
                         ? live.currentUserId
                         : eq.currentUserId;
-
-                    // Get student name
-                    const studentName = userId
+                    const studentName = isLocked
+                      ? "-"
+                      : userId
                       ? studentNames[userId] || "Loading..."
                       : "N/A";
 
-                    // Get gateway location
-                    const gateway = live?.gateway || "Not Active";
-
-                    // Determine status
-                    let displayStatus =
-                      live?.status || eq.status?.status || "OFFLINE";
-                    displayStatus = displayStatus
-                      .toUpperCase()
-                      .replace(/_/g, " ");
+                    // 5. Metrics: Prepare values (will be conditionally rendered as "-" in JSX)
+                    const healthVal =
+                      live?.healthScore ?? eq.status?.healthScore ?? 0;
+                    const tempVal =
+                      live?.temperature ?? eq.analyticsParams?.temperature;
+                    const vibVal =
+                      live?.vibration ?? eq.analyticsParams?.vibration;
+                    const energyVal =
+                      live?.energyConsumption ??
+                      eq.analyticsParams?.energyConsumption;
 
                     return (
                       <tr
                         key={eq.id}
                         className={`hover:bg-gray-50 transition-colors duration-500 ${
-                          isFresh ? "bg-green-50" : ""
+                          isFresh && !isLocked ? "bg-green-50" : ""
                         }`}
                       >
-                        {/* Equipment */}
+                        {/* Equipment Name */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-gray-900">
                               {eq.name}
                             </span>
-                            {live && (
+                            {live && !isLocked && (
                               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
                             )}
                           </div>
                         </td>
 
-                        {/* Access Control */}
+                        {/* Access Control (Button) */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           {isLocked ? (
                             <button
@@ -1001,16 +1026,20 @@ export default function LabAnalyticsPage() {
                         {/* Gateway */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
-                            <MapPin
-                              className={`w-3.5 h-3.5 ${
-                                gateway !== "Not Active"
-                                  ? "text-blue-600"
-                                  : "text-gray-400"
-                              }`}
-                            />
+                            {gateway !== "-" && (
+                              <MapPin
+                                className={`w-3.5 h-3.5 ${
+                                  gateway !== "Not Active"
+                                    ? "text-blue-600"
+                                    : "text-gray-400"
+                                }`}
+                              />
+                            )}
                             <span
                               className={`text-xs font-medium ${
-                                gateway !== "Not Active"
+                                gateway === "-"
+                                  ? "text-gray-400"
+                                  : gateway !== "Not Active"
                                   ? "text-blue-700"
                                   : "text-gray-500"
                               }`}
@@ -1022,7 +1051,7 @@ export default function LabAnalyticsPage() {
 
                         {/* Last Updated */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                          {formatTimestamp(displayTime)}
+                          {displayTime}
                         </td>
 
                         {/* Status */}
@@ -1032,7 +1061,7 @@ export default function LabAnalyticsPage() {
                             style={{
                               backgroundColor:
                                 STATUS_COLORS[displayStatus] ||
-                                STATUS_COLORS.OFFLINE,
+                                STATUS_COLORS.IDLE, // Fallback to IDLE color
                             }}
                           >
                             {displayStatus}
@@ -1041,53 +1070,58 @@ export default function LabAnalyticsPage() {
 
                         {/* Health */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span
-                            className={
-                              isFresh ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {(
-                              live?.healthScore ??
-                              eq.status?.healthScore ??
-                              0
-                            ).toFixed(0)}
-                            %
-                          </span>
+                          {isLocked ? (
+                            <span className="text-gray-400">-</span>
+                          ) : (
+                            <span
+                              className={
+                                isFresh ? "font-bold text-green-700" : ""
+                              }
+                            >
+                              {healthVal.toFixed(0)}%
+                            </span>
+                          )}
                         </td>
 
                         {/* Temp */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <span
-                            className={
-                              isFresh ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {(
-                              live?.temperature ??
-                              eq.analyticsParams?.temperature
-                            )?.toFixed(1) ?? "N/A"}
-                            °C
-                          </span>
+                          {isLocked ? (
+                            <span className="text-gray-400">-</span>
+                          ) : (
+                            <span
+                              className={
+                                isFresh ? "font-bold text-green-700" : ""
+                              }
+                            >
+                              {tempVal?.toFixed(1) ?? "N/A"} °C
+                            </span>
+                          )}
                         </td>
 
                         {/* Vib */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <span
-                            className={
-                              isFresh ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {(
-                              live?.vibration ?? eq.analyticsParams?.vibration
-                            )?.toFixed(2) ?? "-"}
-                          </span>
+                          {isLocked ? (
+                            <span className="text-gray-400">-</span>
+                          ) : (
+                            <span
+                              className={
+                                isFresh ? "font-bold text-green-700" : ""
+                              }
+                            >
+                              {vibVal?.toFixed(2) ?? "-"}
+                            </span>
+                          )}
                         </td>
 
                         {/* Energy */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                          {eq.analyticsParams?.energyConsumption
-                            ? eq.analyticsParams.energyConsumption.toFixed(0)
-                            : "-"}
+                          {isLocked ? (
+                            "-"
+                          ) : energyVal ? (
+                            energyVal.toFixed(0)
+                          ) : (
+                            "-"
+                          )}
                         </td>
                       </tr>
                     );
