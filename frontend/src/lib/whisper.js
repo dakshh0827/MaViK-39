@@ -1,16 +1,12 @@
-// Alternative implementation using dynamic imports
+// Complete rewrite with better model and state handling
 let transformersModule = null;
-let transcriber = null;
-let isLoading = false;
 
 async function loadTransformersModule() {
   if (transformersModule) return transformersModule;
   
   try {
-    // Dynamic import to defer loading
     transformersModule = await import('@xenova/transformers');
     
-    // Configure AFTER import
     transformersModule.env.allowLocalModels = false;
     transformersModule.env.useBrowserCache = true;
     transformersModule.env.backends.onnx.wasm.wasmPaths = 
@@ -23,57 +19,47 @@ async function loadTransformersModule() {
   }
 }
 
-export async function loadWhisper() {
-  if (transcriber) return transcriber;
-  if (isLoading) {
-    while (isLoading) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    return transcriber;
-  }
-
-  isLoading = true;
-  console.log("🎤 Loading Whisper model...");
-
+export async function transcribeAudio(audioBlob) {
+  let audioContext = null;
+  let transcriber = null;
+  
   try {
+    console.log("🎙️ Starting transcription...");
+    console.log("Audio blob size:", audioBlob.size, "bytes");
+    
+    // Load transformers
     const transformers = await loadTransformersModule();
     
+    // Create a NEW pipeline instance for each transcription
+    console.log("Creating fresh Whisper pipeline...");
     transcriber = await transformers.pipeline(
       "automatic-speech-recognition",
-      "Xenova/whisper-tiny.en",
+      "Xenova/whisper-base.en", // Using base model - more reliable than tiny
       {
         quantized: true,
-        progress_callback: (progress) => {
-          if (progress.status === 'downloading') {
-            const percent = progress.progress ? Math.round(progress.progress) : 0;
-            console.log(`📥 ${progress.file}: ${percent}%`);
-          }
-        }
       }
     );
-
-    console.log("✅ Whisper ready!");
-    return transcriber;
-
-  } catch (err) {
-    console.error("❌ Load failed:", err);
-    transcriber = null;
-    throw err;
-  } finally {
-    isLoading = false;
-  }
-}
-
-export async function transcribeAudio(audioBlob) {
-  try {
-    const transcriber = await loadWhisper();
+    console.log("✅ Pipeline ready!");
     
     // Convert to ArrayBuffer
     const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Create audio context
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 48000
+    });
     
     // Decode audio
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    console.log("Audio decoded:", {
+      duration: audioBuffer.duration,
+      sampleRate: audioBuffer.sampleRate,
+      channels: audioBuffer.numberOfChannels
+    });
+
+    if (audioBuffer.duration < 0.5) {
+      throw new Error("Recording too short - please speak for at least 1 second");
+    }
     
     // Resample to 16kHz
     const targetSampleRate = 16000;
@@ -90,27 +76,69 @@ export async function transcribeAudio(audioBlob) {
 
     const resampledBuffer = await offlineCtx.startRendering();
     const float32Data = resampledBuffer.getChannelData(0);
-
-    // Transcribe
-    const output = await transcriber(float32Data, {
-      language: 'english',
-      task: 'transcribe',
-      chunk_length_s: 30,
-      stride_length_s: 5,
+    
+    console.log("Audio ready:", {
+      samples: float32Data.length,
+      duration: (float32Data.length / targetSampleRate).toFixed(2) + "s"
     });
 
-    audioContext.close();
-
-    const text = Array.isArray(output) ? output[0]?.text : output?.text;
+    // Check amplitude
+    const rms = Math.sqrt(float32Data.reduce((sum, val) => sum + val * val, 0) / float32Data.length);
+    console.log("Audio RMS:", rms);
     
-    if (!text?.trim()) {
-      throw new Error("No speech detected");
+    if (rms < 0.001) {
+      throw new Error("Audio volume too low - please speak louder");
+    }
+
+    // Transcribe with minimal options
+    console.log("🔄 Transcribing...");
+    const output = await transcriber(float32Data, {
+      language: 'en',
+    });
+
+    console.log("Raw output:", output);
+
+    // Close audio context
+    if (audioContext && audioContext.state !== 'closed') {
+      await audioContext.close();
+    }
+
+    // Extract text
+    let text = '';
+    if (output && typeof output === 'object') {
+      if (output.text) {
+        text = output.text.trim();
+      } else if (Array.isArray(output) && output[0]?.text) {
+        text = output[0].text.trim();
+      }
+    }
+
+    console.log("Final text:", text);
+    
+    if (!text) {
+      throw new Error("No speech detected - please try again and speak clearly");
     }
 
     return text;
 
   } catch (error) {
-    console.error("Transcription error:", error);
+    console.error("❌ Transcription error:", error);
+    
+    if (audioContext && audioContext.state !== 'closed') {
+      try {
+        await audioContext.close();
+      } catch (e) {
+        console.warn("Failed to close audio context:", e);
+      }
+    }
+    
+    if (error.message.includes("decodeAudioData")) {
+      throw new Error("Audio format error - please try again");
+    }
+    
     throw error;
+  } finally {
+    // Always dispose the transcriber
+    transcriber = null;
   }
 }

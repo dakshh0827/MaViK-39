@@ -53,7 +53,7 @@ export default function ChatbotPage() {
     setBriefingResponse(null);
 
     const prompt =
-      "Give me the detailed daily report of all the CNC_LATHE, Laser_Engraver, Manual_Arc_Welder machines for today";
+      "Give me the detailed daily report of all the CNC_LATHE, Laser_Engraver, Manual_Arc_Welder machines for 2025-12-09";
 
     try {
       const response = await generateBriefing(prompt);
