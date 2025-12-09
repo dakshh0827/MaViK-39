@@ -13,7 +13,7 @@ import {
   FaBuilding,
   FaDesktop,
   FaExclamationTriangle,
-  FaExternalLinkAlt, // Added icon for the external link
+  FaExternalLinkAlt, 
 } from "react-icons/fa";
 import { ImLab } from "react-icons/im";
 import { useState, useEffect, useRef } from "react";
@@ -22,6 +22,9 @@ import { useAuthStore } from "../../stores/authStore";
 // Import Modals
 import InstituteManagerForm from "../../components/admin/InstituteManagerForm";
 import LabManagerForm from "../../components/admin/LabManagerForm";
+
+// Import the new ChatWidget
+import ChatWidget from "../../components/chatbot/ChatWidget";
 
 export default function DashboardLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
@@ -42,112 +45,9 @@ export default function DashboardLayout() {
   // Ref for the quick menu container
   const quickMenuRef = useRef(null);
 
-  // --- N8N CHATBOT INTEGRATION ---
-
-  // 1. Initialization & Cleanup (Runs ONCE on mount/unmount)
-  useEffect(() => {
-    // Inject Styles for Floating Widget
-    if (!document.getElementById("n8n-chat-style")) {
-      const link = document.createElement("link");
-      link.id = "n8n-chat-style";
-      link.href = "https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css";
-      link.rel = "stylesheet";
-      document.head.appendChild(link);
-    }
-
-    // Inject Custom CSS
-    if (!document.getElementById("n8n-chat-custom-css")) {
-      const style = document.createElement("style");
-      style.id = "n8n-chat-custom-css";
-      style.innerHTML = `
-        :root {
-          --chat--font-size: 13px !important;
-          --chat--message--font-size: 13px !important;
-          --chat--input--font-size: 13px !important;
-          --chat--header--title--font-size: 15px !important;
-          --chat--window--width: 380px;
-        }
-        .n8n-chat-widget {
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-          z-index: 9999 !important; /* Ensure it stays on top */
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    // Inject Script
-    if (!document.getElementById("n8n-chat-script")) {
-      const script = document.createElement("script");
-      script.id = "n8n-chat-script";
-      script.type = "module";
-      script.innerHTML = `
-        import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
-        
-        createChat({
-          webhookUrl: 'https://aaryannn1234.app.n8n.cloud/webhook/55d1251c-a027-43a2-ab26-ddfa93b742fd/chat',
-          showWelcomeScreen: false,
-          initialMessages: [
-            'Hi there!',
-            'How can I help you?'
-          ],
-          i18n: {
-            en: {
-              title: 'Chatbot',
-              subtitle: '',
-              getStarted: 'New Conversation',
-              inputPlaceholder: 'Type your message...',
-            }
-          },
-          style: {
-            accentColor: '#155dfc',
-            background: '#ffffff',
-            color: '#1e293b',
-          }
-        });
-      `;
-      document.body.appendChild(script);
-    }
-
-    // --- CLEANUP FUNCTION ---
-    return () => {
-      document.getElementById("n8n-chat-script")?.remove();
-      document.getElementById("n8n-chat-style")?.remove();
-      document.getElementById("n8n-chat-custom-css")?.remove();
-
-      const widget = document.querySelector(".n8n-chat-widget");
-      if (widget) {
-        widget.remove();
-      }
-
-      const chatRoot = document.querySelector(".n8n-chat");
-      if (chatRoot) {
-        chatRoot.remove();
-      }
-    };
-  }, []);
-
-  // 2. Visibility Toggle based on Route
-  useEffect(() => {
-    const styleId = "n8n-chat-toggle-style";
-    let styleTag = document.getElementById(styleId);
-
-    if (location.pathname === "/chatbot") {
-      if (!styleTag) {
-        styleTag = document.createElement("style");
-        styleTag.id = styleId;
-        styleTag.innerHTML = `
-          .n8n-chat-widget { display: none !important; }
-        `;
-        document.head.appendChild(styleTag);
-      }
-    } else {
-      if (styleTag) {
-        styleTag.remove();
-      }
-    }
-  }, [location.pathname]);
-
-  // --- REST OF YOUR COMPONENT LOGIC ---
+  // --- CLEANED UP: REMOVED N8N SCRIPT INJECTION LOGIC ---
+  // The custom ChatWidget component below replaces the functionality
+  // allowing us to integrate the Whisper voice features directly.
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -184,6 +84,7 @@ export default function DashboardLayout() {
   const role = user?.role;
 
   const renderQuickActions = () => {
+    // ... (Your existing renderQuickActions logic remains unchanged) ...
     if (role === "POLICY_MAKER") {
       return (
         <>
@@ -259,7 +160,6 @@ export default function DashboardLayout() {
         </>
       );
     }
-
     return null;
   };
 
@@ -331,7 +231,7 @@ export default function DashboardLayout() {
             ref={quickMenuRef}
             className="p-3 border-t border-gray-100 bg-white relative overflow-visible"
           >
-            {/* The Pop-up Menu Card */}
+             {/* ... (Kept exactly as original) ... */}
             <div
               className={`
                 absolute bottom-full left-2 mb-3
@@ -417,6 +317,10 @@ export default function DashboardLayout() {
         {/* Pass trigger states down via context so dashboard can listen to them */}
         <Outlet context={{ triggerEquipmentModal, triggerBreakdownModal }} />
       </main>
+
+      {/* GLOBAL CHAT WIDGET (With Voice) */}
+      {/* Hide the widget if we are on the full chatbot page to avoid duplicates */}
+      {location.pathname !== "/chatbot" && <ChatWidget />}
 
       {/* GLOBAL MODALS */}
       {isInstituteModalOpen && (

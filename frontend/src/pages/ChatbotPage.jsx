@@ -1,5 +1,5 @@
 // =====================================================
-// src/pages/ChatbotPage.jsx - UPDATED VERSION (No Filters)
+// src/pages/ChatbotPage.jsx - UPDATED WITH VOICE
 // =====================================================
 
 import { useState, useEffect, useRef } from "react";
@@ -14,6 +14,7 @@ import {
   FaPlay,
 } from "react-icons/fa";
 import LoadingSpinner from "../components/common/LoadingSpinner";
+import VoiceInput from "../components/common/VoiceInput"; // Import Voice Input
 
 export default function ChatbotPage() {
   // --- Left Section Stores (Chatbot) ---
@@ -42,11 +43,15 @@ export default function ChatbotPage() {
     await sendMessage(userMessage);
   };
 
+  // Callback for voice input
+  const handleVoiceTranscription = (text) => {
+    setInput(text);
+  };
+
   const handleGenerateBriefing = async () => {
     setIsBriefingLoading(true);
     setBriefingResponse(null);
 
-    // Updated Prompt as requested
     const prompt =
       "Give me the detailed daily report of all the CNC_LATHE, Laser_Engraver, Manual_Arc_Welder machines for today";
 
@@ -82,7 +87,7 @@ export default function ChatbotPage() {
             <FaRobot className="text-blue-600" /> AI Operations Center
           </h1>
           <p className="text-xs text-gray-500 mt-1">
-            Powered by MaViK-39 Neural Engine
+            Powered by MaViK-39 Neural Engine & Whisper Voice AI
           </p>
         </div>
       </div>
@@ -189,7 +194,13 @@ export default function ChatbotPage() {
 
           {/* Input Footer */}
           <div className="p-3 bg-white border-t border-gray-100 shrink-0">
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-1 pl-3 flex gap-2 items-center">
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-1 pl-1 flex gap-2 items-center">
+              {/* Insert Voice Input Here */}
+              <VoiceInput 
+                 onTranscriptionComplete={handleVoiceTranscription} 
+                 disabled={isLoading}
+              />
+              
               <input
                 type="text"
                 value={input}
@@ -200,7 +211,7 @@ export default function ChatbotPage() {
                     handleChatSubmit(e);
                   }
                 }}
-                placeholder="Type your message..."
+                placeholder="Type or speak..."
                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-700 placeholder-gray-400"
                 disabled={isLoading}
               />
@@ -220,6 +231,7 @@ export default function ChatbotPage() {
         </div>
 
         {/* ================= RIGHT SECTION: DAILY BRIEFING ================= */}
+        {/* ... (Kept exactly as original) ... */}
         <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {/* Section Header */}
           <div className="p-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
