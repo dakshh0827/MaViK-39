@@ -1,6 +1,7 @@
+// src/components/common/VoiceInput.jsx
 import { useState, useRef } from "react";
-import { FaMicrophone, FaStop, FaSpinner } from "react-icons/fa";
-import { transcribeAudio } from "../../lib/whisper.js";
+import { FaMicrophone, FaStop, FaSpinner, FaMicrophoneSlash } from "react-icons/fa";
+import { transcribeAudio } from "../../lib/whisper"; // Ensure path matches your structure
 
 export default function VoiceInput({ onTranscriptionComplete, disabled }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -21,10 +22,10 @@ export default function VoiceInput({ onTranscriptionComplete, disabled }) {
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/wav" });
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         await handleTranscription(blob);
         
-        // Stop all tracks to release microphone
+        // Stop all tracks to release microphone completely
         stream.getTracks().forEach((track) => track.stop());
       };
 
@@ -32,7 +33,7 @@ export default function VoiceInput({ onTranscriptionComplete, disabled }) {
       setIsRecording(true);
     } catch (err) {
       console.error("Error accessing microphone:", err);
-      alert("Could not access microphone. Please check permissions.");
+      alert("Could not access microphone. Please check your browser permissions.");
     }
   };
 
@@ -52,7 +53,7 @@ export default function VoiceInput({ onTranscriptionComplete, disabled }) {
       }
     } catch (error) {
       console.error("Processing error:", error);
-      alert("Failed to process audio. Please try again.");
+      alert("Failed to process audio. See console for details.");
     } finally {
       setIsProcessing(false);
     }
@@ -63,12 +64,12 @@ export default function VoiceInput({ onTranscriptionComplete, disabled }) {
       type="button"
       onClick={isRecording ? stopRecording : startRecording}
       disabled={disabled || isProcessing}
-      className={`p-2 rounded-lg transition-all shadow-sm flex items-center justify-center ${
+      className={`p-2.5 rounded-full transition-all duration-200 shadow-sm flex items-center justify-center ${
         isRecording
-          ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
+          ? "bg-red-500 text-white hover:bg-red-600 animate-pulse ring-4 ring-red-100"
           : isProcessing
-          ? "bg-gray-100 text-gray-500 cursor-wait"
-          : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-blue-600"
+          ? "bg-amber-100 text-amber-600 cursor-wait"
+          : "bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600"
       }`}
       title={isRecording ? "Stop Recording" : "Voice Input"}
     >
