@@ -1,19 +1,16 @@
-// mobile/src/stores/chatbotStore.js
 import { create } from "zustand";
 import { v4 as uuidv4 } from "uuid";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import "react-native-get-random-values"; // Required for uuid to work on mobile
+import "react-native-get-random-values";
 
-// Updated n8n Webhook URL
 const WEBHOOK_URL =
   "https://aaryannn1234.app.n8n.cloud/webhook/55d1251c-a027-43a2-ab26-ddfa93b742fd/chat";
 
 export const useChatbotStore = create((set, get) => ({
   messages: [],
   isLoading: false,
-  sessionId: uuidv4(), // Temporary ID until we load from storage
+  sessionId: uuidv4(),
 
-  // Initialize session (Async for Mobile)
   initSession: async () => {
     try {
       let id = await AsyncStorage.getItem("n8n_chat_session");
@@ -29,9 +26,7 @@ export const useChatbotStore = create((set, get) => ({
     }
   },
 
-  // Fetch history
   fetchHistory: async () => {
-    // Ensure session is loaded first
     let { sessionId } = get();
     if (!sessionId) sessionId = await get().initSession();
 
@@ -44,24 +39,21 @@ export const useChatbotStore = create((set, get) => ({
 
       if (response.ok) {
         const data = await response.json();
-
         const uiMessages = [];
-        let currentPair = {};
 
+        // REFACTOR: Flatten history into individual bubbles
         if (Array.isArray(data)) {
           data.forEach((msg) => {
-            if (msg.role === "user" || msg.type === "human") {
-              if (currentPair.message) uiMessages.push(currentPair);
-              currentPair = { message: msg.text || msg.content };
-            } else {
-              currentPair.response = msg.text || msg.content;
-              if (currentPair.message) {
-                uiMessages.push(currentPair);
-                currentPair = {};
-              }
-            }
+            // Determine role based on n8n structure
+            const isUser = msg.role === "user" || msg.type === "human";
+
+            uiMessages.push({
+              _id: uuidv4(), // Give every message a unique ID
+              text: msg.text || msg.content || "",
+              role: isUser ? "user" : "ai",
+              createdAt: new Date(),
+            });
           });
-          if (currentPair.message) uiMessages.push(currentPair);
 
           set({ messages: uiMessages, isLoading: false });
         } else {
@@ -78,11 +70,20 @@ export const useChatbotStore = create((set, get) => ({
 
   sendMessage: async (message) => {
     const { sessionId } = get();
-    set({ isLoading: true });
 
-    // Optimistically add user message to UI
-    const tempMessage = { message, response: null };
-    set((state) => ({ messages: [...state.messages, tempMessage] }));
+    // 1. Create User Message Object
+    const userMsg = {
+      _id: uuidv4(),
+      text: message,
+      role: "user", // Explicitly set role
+      createdAt: new Date(),
+    };
+
+    // 2. Add User Message to State immediately
+    set((state) => ({
+      messages: [...state.messages, userMsg],
+      isLoading: true,
+    }));
 
     try {
       const response = await fetch(WEBHOOK_URL, {
@@ -100,36 +101,42 @@ export const useChatbotStore = create((set, get) => ({
 
       const data = await response.json();
 
-      let botResponse =
+      let botText =
         "I received your message but couldn't process the response.";
 
       if (data && typeof data === "object") {
-        if (data.output) botResponse = data.output;
-        else if (data.text) botResponse = data.text;
+        if (data.output) botText = data.output;
+        else if (data.text) botText = data.text;
         else if (Array.isArray(data) && data[0]?.output)
-          botResponse = data[0].output;
-        else if (data.data) botResponse = data.data;
+          botText = data[0].output;
+        else if (data.data) botText = data.data;
       }
 
+      // 3. Create Bot Message Object
+      const botMsg = {
+        _id: uuidv4(),
+        text: botText,
+        role: "ai",
+        createdAt: new Date(),
+      };
+
+      // 4. Append Bot Message to State (Don't overwrite user message)
       set((state) => ({
-        messages: state.messages.map((msg, index) =>
-          index === state.messages.length - 1
-            ? { ...msg, response: botResponse }
-            : msg
-        ),
+        messages: [...state.messages, botMsg],
         isLoading: false,
       }));
     } catch (error) {
       console.error("Chat error:", error);
+
+      const errorMsg = {
+        _id: uuidv4(),
+        text: "Error: Could not connect to the AI assistant.",
+        role: "ai",
+        isError: true,
+      };
+
       set((state) => ({
-        messages: state.messages.map((msg, index) =>
-          index === state.messages.length - 1
-            ? {
-                ...msg,
-                response: "Error: Could not connect to the AI assistant.",
-              }
-            : msg
-        ),
+        messages: [...state.messages, errorMsg],
         isLoading: false,
       }));
     }

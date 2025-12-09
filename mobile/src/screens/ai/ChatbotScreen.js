@@ -96,7 +96,19 @@ export default function ChatbotScreen({ navigation }) {
   };
 
   const renderMessage = ({ item }) => {
-    const isUser = item.role === "user" || item.sender === "user";
+    // Debugging: Check your terminal to see the actual structure of 'item'
+    // console.log("Message Item:", item);
+
+    // Improved check: handles capitalization and checks for a direct 'isUser' flag
+    const isUser =
+      item.role?.toLowerCase() === "user" ||
+      item.sender?.toLowerCase() === "user" ||
+      item.isUser === true;
+
+    // Note: added item.response check. Usually only the Bot has a 'response' key.
+    // If 'text' exists but no role is defined, we might assume it's user,
+    // but it's safer to fix the data source.
+
     const text = item.content || item.message || item.text || item.response;
 
     return (
@@ -165,7 +177,6 @@ export default function ChatbotScreen({ navigation }) {
       </View>
     );
   };
-
   const quickActions = [
     "Show equipment status",
     "Recent alerts",
