@@ -32,6 +32,7 @@ import {
   BookOpen,
   Lock,
   Unlock,
+  MapPin,
 } from "lucide-react";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import api from "../../lib/axios";
@@ -141,6 +142,7 @@ const getISOStandard = (department) => {
   return null;
 };
 
+// --- PredictiveMaintenanceCard ---
 const PredictiveMaintenanceCard = ({ equipment, prediction }) => {
   if (!prediction) return null;
 
@@ -205,6 +207,25 @@ const PredictiveMaintenanceCard = ({ equipment, prediction }) => {
   );
 };
 
+const GATEWAY_LOCATION =
+  "Jaipur, Jaipur Municipal Corporation - 302025, Rajasthan, India";
+const GATEWAY_COORDS = {
+  lat: 26.823562,
+  lng: 75.865466,
+};
+
+// Helper to fetch student name
+const fetchStudentName = async (studentId) => {
+  if (!studentId) return "N/A";
+  try {
+    const response = await api.get(`/students/${studentId}`);
+    return `${response.data.data.firstName} ${response.data.data.lastName}`;
+  } catch (error) {
+    console.error("Failed to fetch student name:", error);
+    return "Unknown";
+  }
+};
+
 export default function LabAnalyticsPage() {
   const { labId } = useParams();
   const navigate = useNavigate();
@@ -220,7 +241,11 @@ export default function LabAnalyticsPage() {
 
   // --- AUTHENTICATION STATE ---
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [selectedEquipmentForAuth, setSelectedEquipmentForAuth] = useState(null);
+  const [selectedEquipmentForAuth, setSelectedEquipmentForAuth] =
+    useState(null);
+
+  // --- STUDENT NAMES STATE ---
+  const [studentNames, setStudentNames] = useState({});
 
   // --- SOCKET.IO CONNECTION ---
   useEffect(() => {
@@ -286,12 +311,35 @@ export default function LabAnalyticsPage() {
   }, []);
 
   // ========================================
-  // 🆕 HANDLE LIVE UPDATES (Status + Auth + Metrics)
+  // HANDLE LIVE UPDATES (Status + Auth + Metrics)
   // ========================================
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
 
     if (!equipmentId) return;
+
+    let computedStatus = data.status;
+    let gatewayLocation = null;
+
+    // Check existing lock state or default to current data's lock state
+    const currentIsLocked = liveUpdates[equipmentId]?.isLocked ?? data.isLocked;
+
+    // Determine status and gateway based on lock state and data transmission
+    if (!currentIsLocked) {
+      // If unlocked and receiving metric data, mark as IN USE
+      if (data.temperature !== undefined || data.vibration !== undefined) {
+        computedStatus = "IN USE";
+        gatewayLocation = GATEWAY_LOCATION; // Show location when transmitting data
+      } else {
+        // If unlocked but no recent metrics, assume operational
+        computedStatus = "OPERATIONAL";
+        gatewayLocation = null; // No location if not transmitting
+      }
+    } else {
+      // If locked, use provided status or default to IDLE
+      computedStatus = data.status || "IDLE";
+      gatewayLocation = null; // No location when locked
+    }
 
     // 1. Update Live Indicator State
     setLiveUpdates((prev) => ({
@@ -302,12 +350,15 @@ export default function LabAnalyticsPage() {
         vibration: data.vibration,
         healthScore: data.healthScore,
         efficiency: data.efficiency,
-        status: data.status,
+        status: computedStatus,
         energyConsumption: data.energyConsumption,
-        
+
         // Authentication Updates
         isLocked: data.isLocked,
         currentUserId: data.currentUserId,
+
+        // Gateway: Show location only when actively transmitting data
+        gateway: gatewayLocation,
 
         // Timestamp
         timestamp: data.readingTimestamp || new Date().toISOString(),
@@ -325,11 +376,14 @@ export default function LabAnalyticsPage() {
             ...eq,
             // Merge Auth State
             isLocked: data.isLocked !== undefined ? data.isLocked : eq.isLocked,
-            currentUserId: data.currentUserId !== undefined ? data.currentUserId : eq.currentUserId,
+            currentUserId:
+              data.currentUserId !== undefined
+                ? data.currentUserId
+                : eq.currentUserId,
 
             status: {
               ...eq.status,
-              status: data.status || eq.status?.status,
+              status: computedStatus || data.status || eq.status?.status,
               healthScore: data.healthScore ?? eq.status?.healthScore,
               lastUsedAt: data.readingTimestamp || new Date().toISOString(),
             },
@@ -338,7 +392,8 @@ export default function LabAnalyticsPage() {
               temperature: data.temperature ?? eq.analyticsParams?.temperature,
               vibration: data.vibration ?? eq.analyticsParams?.vibration,
               efficiency: data.efficiency ?? eq.analyticsParams?.efficiency,
-              energyConsumption: data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
+              energyConsumption:
+                data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
             },
           };
         }
@@ -399,33 +454,63 @@ export default function LabAnalyticsPage() {
     }
   }, [labId]);
 
+  // --- FETCH ALL STUDENT NAMES ---
+  useEffect(() => {
+    const fetchAllStudentNames = async () => {
+      if (!labData?.equipment) return;
+
+      const names = {};
+      const uniqueUserIds = new Set();
+
+      // Collect unique user IDs from initial data and live updates
+      labData.equipment.forEach((eq) => {
+        const userId = liveUpdates[eq.id]?.currentUserId ?? eq.currentUserId;
+        if (userId) uniqueUserIds.add(userId);
+      });
+
+      for (const userId of uniqueUserIds) {
+        if (!studentNames[userId]) {
+          names[userId] = await fetchStudentName(userId);
+        }
+      }
+
+      // Merge new names with existing state
+      setStudentNames((prev) => ({ ...prev, ...names }));
+    };
+
+    fetchAllStudentNames();
+  }, [labData, liveUpdates]);
+
   // --- AUTH HANDLERS ---
   const handleAuthClick = (equipment) => {
-    if (!equipment.isLocked) return; // Prevent clicking if already unlocked
+    if (!equipment.isLocked) return;
     setSelectedEquipmentForAuth(equipment);
     setShowAuthModal(true);
   };
 
   const handleAuthSuccess = (data) => {
     console.log("Authentication Successful:", data);
-    
-    // Optional: Refresh full data to ensure cascading unlocks are reflected if socket is slow
-    api.get(`/monitoring/lab-analytics/${labId}`)
-       .then(res => setLabData(res.data.data))
-       .catch(console.error);
+
+    // Refresh full data to ensure cascading unlocks are reflected
+    api
+      .get(`/monitoring/lab-analytics/${labId}`)
+      .then((res) => setLabData(res.data.data))
+      .catch(console.error);
   };
 
   // --- CHART DATA PREPARATION ---
   const chartData = useMemo(() => {
     if (!labData || !labData.equipment) return null;
 
-    // 1. Merge liveUpdates into the equipment list
+    // Merge liveUpdates into the equipment list
     const equipment = labData.equipment.map((eq) => {
       const live = liveUpdates[eq.id];
       if (!live) return eq;
 
       return {
         ...eq,
+        isLocked: live.isLocked ?? eq.isLocked,
+        currentUserId: live.currentUserId ?? eq.currentUserId,
         status: {
           ...eq.status,
           status: live.status || eq.status?.status,
@@ -436,7 +521,8 @@ export default function LabAnalyticsPage() {
           temperature: live.temperature ?? eq.analyticsParams?.temperature,
           vibration: live.vibration ?? eq.analyticsParams?.vibration,
           efficiency: live.efficiency ?? eq.analyticsParams?.efficiency,
-          energyConsumption: live.energyConsumption ?? eq.analyticsParams?.energyConsumption,
+          energyConsumption:
+            live.energyConsumption ?? eq.analyticsParams?.energyConsumption,
         },
       };
     });
@@ -548,7 +634,7 @@ export default function LabAnalyticsPage() {
   return (
     <div className="min-h-screen bg-gray-200 flex flex-col">
       {/* --- AUTH MODAL --- */}
-      <BiometricAuthModal 
+      <BiometricAuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         equipmentId={selectedEquipmentForAuth?.id}
@@ -777,15 +863,19 @@ export default function LabAnalyticsPage() {
           </div>
         )}
 
-        {/* Live Equipment Table with AUTH Controls & Qualification */}
+        {/* Live Equipment Table with AUTH Controls & Gateway */}
         {labData.equipment && labData.equipment.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
               <div className="flex flex-col">
-                <h3 className="font-bold text-gray-900">Equipment Access & Metrics</h3>
-                <span className="text-xs text-gray-500">Click on 'Locked' button to authenticate via Biometrics</span>
+                <h3 className="font-bold text-gray-900">
+                  Equipment Access & Metrics
+                </h3>
+                <span className="text-xs text-gray-500">
+                  Click on 'Locked' button to authenticate via Biometrics
+                </span>
               </div>
-              
+
               {Object.keys(liveUpdates).length > 0 && (
                 <span className="text-xs text-green-600 flex items-center gap-1 font-bold animate-pulse">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -801,10 +891,16 @@ export default function LabAnalyticsPage() {
                       Equipment
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Qualification
+                      Access Control
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Access Control
+                      Student Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Gateway
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Last Updated
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
                       Status
@@ -821,22 +917,41 @@ export default function LabAnalyticsPage() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
                       Energy
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Last Updated
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {labData.equipment.map((eq) => {
                     const live = liveUpdates[eq.id];
                     const isFresh = live && new Date() - live.updatedAt < 5000;
-                    const displayTime = live?.timestamp || eq.status?.lastUsedAt;
+                    const displayTime =
+                      live?.timestamp || eq.status?.lastUsedAt;
 
-                    // CHECK FOR QUALIFICATION DATA
-                    const qualification = getQualificationData(eq.name);
+                    // Determine Lock State
+                    const isLocked =
+                      live?.isLocked !== undefined
+                        ? live.isLocked
+                        : eq.isLocked;
 
-                    // Determine Lock State (Live update takes precedence, fallback to initial fetch)
-                    const isLocked = live?.isLocked !== undefined ? live.isLocked : eq.isLocked;
+                    // Get current user ID
+                    const userId =
+                      live?.currentUserId !== undefined
+                        ? live.currentUserId
+                        : eq.currentUserId;
+
+                    // Get student name
+                    const studentName = userId
+                      ? studentNames[userId] || "Loading..."
+                      : "N/A";
+
+                    // Get gateway location
+                    const gateway = live?.gateway || "Not Active";
+
+                    // Determine status
+                    let displayStatus =
+                      live?.status || eq.status?.status || "OFFLINE";
+                    displayStatus = displayStatus
+                      .toUpperCase()
+                      .replace(/_/g, " ");
 
                     return (
                       <tr
@@ -845,6 +960,7 @@ export default function LabAnalyticsPage() {
                           isFresh ? "bg-green-50" : ""
                         }`}
                       >
+                        {/* Equipment */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-gray-900">
@@ -856,55 +972,74 @@ export default function LabAnalyticsPage() {
                           </div>
                         </td>
 
-                        {/* QUALIFICATION LINK CELL */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {qualification ? (
-                            <a
-                              href={qualification.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              View NQR
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          ) : (
-                            <span className="text-xs text-gray-400">N/A</span>
-                          )}
-                        </td>
-
-                        {/* AUTHENTICATION / LOCK COLUMN */}
+                        {/* Access Control */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           {isLocked ? (
                             <button
-                                onClick={() => handleAuthClick(eq)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors border border-red-200 shadow-sm"
-                                title="Click to Authenticate"
+                              onClick={() => handleAuthClick(eq)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors border border-red-200 shadow-sm"
+                              title="Click to Authenticate"
                             >
-                                <Lock className="w-3.5 h-3.5" />
-                                LOCKED
+                              <Lock className="w-3.5 h-3.5" />
+                              LOCKED
                             </button>
                           ) : (
                             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold border border-green-200">
-                                <Unlock className="w-3.5 h-3.5" />
-                                UNLOCKED
+                              <Unlock className="w-3.5 h-3.5" />
+                              UNLOCKED
                             </div>
                           )}
                         </td>
 
+                        {/* Student Name */}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full text-white`}
-                            style={{
-                              backgroundColor:
-                                STATUS_COLORS[
-                                  live?.status || eq.status?.status
-                                ] || STATUS_COLORS.OFFLINE,
-                            }}
-                          >
-                            {live?.status || eq.status?.status || "OFFLINE"}
+                          <span className="text-sm text-gray-700 font-medium">
+                            {studentName}
                           </span>
                         </td>
+
+                        {/* Gateway */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <MapPin
+                              className={`w-3.5 h-3.5 ${
+                                gateway !== "Not Active"
+                                  ? "text-blue-600"
+                                  : "text-gray-400"
+                              }`}
+                            />
+                            <span
+                              className={`text-xs font-medium ${
+                                gateway !== "Not Active"
+                                  ? "text-blue-700"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              {gateway}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Last Updated */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                          {formatTimestamp(displayTime)}
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className="px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full text-white"
+                            style={{
+                              backgroundColor:
+                                STATUS_COLORS[displayStatus] ||
+                                STATUS_COLORS.OFFLINE,
+                            }}
+                          >
+                            {displayStatus}
+                          </span>
+                        </td>
+
+                        {/* Health */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <span
                             className={
@@ -920,6 +1055,7 @@ export default function LabAnalyticsPage() {
                           </span>
                         </td>
 
+                        {/* Temp */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           <span
                             className={
@@ -934,6 +1070,7 @@ export default function LabAnalyticsPage() {
                           </span>
                         </td>
 
+                        {/* Vib */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           <span
                             className={
@@ -946,13 +1083,11 @@ export default function LabAnalyticsPage() {
                           </span>
                         </td>
 
+                        {/* Energy */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                           {eq.analyticsParams?.energyConsumption
                             ? eq.analyticsParams.energyConsumption.toFixed(0)
                             : "-"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                          {formatTimestamp(displayTime)}
                         </td>
                       </tr>
                     );
