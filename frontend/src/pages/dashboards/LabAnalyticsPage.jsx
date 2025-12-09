@@ -2,7 +2,12 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader"; // Import the Loader
+
+// --- IMPORTS: Loaders & Controls ---
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
 import {
   BarChart,
   Bar,
@@ -35,6 +40,8 @@ import {
   Lock,
   Unlock,
   MapPin,
+  Maximize2, // Icon for expanding
+  X,         // Icon for closing modal
 } from "lucide-react";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import api from "../../lib/axios";
@@ -66,7 +73,7 @@ const QUALIFICATION_DB = {
   lathe: {
     title: "CNC Lathe Operator",
     url: "https://nqr.gov.in/qualifications/11405",
-    modelUrl: "/models/cnc-lathe.obj", // ADD YOUR .OBJ FILE PATH HERE
+    modelUrl: "/3D/cnc.glb",
     stats: {
       Theory: 40,
       Practical: 80,
@@ -77,7 +84,7 @@ const QUALIFICATION_DB = {
   drill: {
     title: "Bench Drill Operator",
     url: "https://nqr.gov.in/qualifications/12082",
-    modelUrl: "/models/bench-drill.obj", // ADD YOUR .OBJ FILE PATH HERE
+    modelUrl: "/3D/bench.glb",
     stats: {
       Theory: 60,
       Practical: 150,
@@ -88,7 +95,7 @@ const QUALIFICATION_DB = {
   weld: {
     title: "Arc Welding Specialist",
     url: "https://nqr.gov.in/qualifications/14234",
-    modelUrl: "/models/arc-welder.obj", // ADD YOUR .OBJ FILE PATH HERE
+    modelUrl: "/3D/welding.glb",
     stats: {
       Theory: 120,
       Practical: 180,
@@ -99,7 +106,7 @@ const QUALIFICATION_DB = {
   laser: {
     title: "Laser Engraver",
     url: "https://nqr.gov.in/qualifications/13977",
-    modelUrl: "/models/laser-engraver.obj", // ADD YOUR .OBJ FILE PATH HERE
+    modelUrl: "/3D/laser.glb",
     stats: {
       Theory: 150,
       Practical: 180,
@@ -109,163 +116,181 @@ const QUALIFICATION_DB = {
   },
 };
 
-const Model3DViewer = ({ modelUrl, equipmentName }) => {
+// ==========================================
+// COMPONENT: 3D Model Viewer (Re-usable)
+// ==========================================
+const Model3DViewer = ({ 
+  modelUrl, 
+  equipmentName, 
+  onExpand, 
+  isFullView = false 
+}) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
   const rendererRef = useRef(null);
+  const controlsRef = useRef(null);
   const modelRef = useRef(null);
   const animationIdRef = useRef(null);
 
-  const [isRotating, setIsRotating] = useState(true);
-  const [isLoading, setIsLoading] = useState(true); // Track loading state
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  // Auto-rotate state (defaults to true for small view, false for full view)
+  const [autoRotate, setAutoRotate] = useState(!isFullView); 
 
   useEffect(() => {
     if (!mountRef.current) return;
 
+    // cleanup previous scene
+    while (mountRef.current.firstChild) {
+      mountRef.current.removeChild(mountRef.current.firstChild);
+    }
+
     // --- 1. Scene Setup ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf8fafc);
+    
+    // UPDATED: Changed background to Gray-900 (0x111827) for modal, keeping slate-50 for widget
+    scene.background = new THREE.Color(0xf9fafb); 
     sceneRef.current = scene;
 
     // --- 2. Camera Setup ---
-    const camera = new THREE.PerspectiveCamera(
-      45,
-      mountRef.current.clientWidth / mountRef.current.clientHeight,
-      0.1,
-      1000
-    );
-    // Initial position (will be adjusted when model loads)
-    camera.position.set(0, 0, 5);
+    const width = mountRef.current.clientWidth;
+    const height = mountRef.current.clientHeight;
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+    camera.position.set(5, 5, 5); // Start at an angle
     cameraRef.current = camera;
 
     // --- 3. Renderer Setup ---
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(
-      mountRef.current.clientWidth,
-      mountRef.current.clientHeight
-    );
+    renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
-    // improving color accuracy for models
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // --- 4. Lighting ---
-    // Ambient light (soft fill)
+    // --- 4. Orbit Controls ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; // Smooth motion
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 2;
+    controls.maxDistance = 20;
+    controls.autoRotate = autoRotate;
+    controls.autoRotateSpeed = 2.0;
+    controlsRef.current = controls;
+
+    // --- 5. Lighting ---
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
 
-    // Main Directional Light (Sun)
-    const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+    const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
     mainLight.position.set(5, 10, 7);
     scene.add(mainLight);
 
-    // Back Light (Rim light to separate model from bg)
-    const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    backLight.position.set(-5, 5, -5);
-    scene.add(backLight);
+    const fillLight = new THREE.DirectionalLight(0xeef2ff, 1.0);
+    fillLight.position.set(-5, 0, -5);
+    scene.add(fillLight);
 
-    // --- 5. GLB Loader Logic ---
+    // --- 6. Loader Setup ---
     const loader = new GLTFLoader();
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    dracoLoader.setDecoderConfig({ type: 'js' });
+    loader.setDRACOLoader(dracoLoader);
+
     setIsLoading(true);
+    setLoadError(null);
 
     loader.load(
       modelUrl,
       (gltf) => {
         const model = gltf.scene;
 
-        // -- Centering and Scaling Logic --
-        // 1. Calculate the bounding box of the model
+        // Centering
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
 
-        // 2. Reset model position to center it at 0,0,0
-        model.position.x += model.position.x - center.x;
-        model.position.y += model.position.y - center.y;
-        model.position.z += model.position.z - center.z;
+        model.position.sub(center);
 
-        // 3. Determine max dimension to adjust camera zoom
+        // Zoom logic
         const maxDim = Math.max(size.x, size.y, size.z);
         const fov = camera.fov * (Math.PI / 180);
-        let cameraZ = Math.abs((maxDim / 2) * Math.tan(fov * 2));
-
-        // Add a multiplier to zoom out slightly (1.5x) so it doesn't touch edges
-        camera.position.z = cameraZ * 2.0;
-        camera.updateProjectionMatrix();
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+        
+        // Adjust zoom based on view mode
+        camera.position.set(cameraZ * 1.5, cameraZ * 0.5, cameraZ * 1.5);
+        camera.lookAt(0, 0, 0);
+        
+        controls.target.set(0, 0, 0);
+        controls.update();
 
         scene.add(model);
         modelRef.current = model;
         setIsLoading(false);
       },
-      undefined, // onProgress (optional)
+      undefined,
       (error) => {
-        console.error("An error occurred loading the model:", error);
+        console.error("Error loading model:", error);
+        setLoadError("Failed to load 3D model.");
         setIsLoading(false);
       }
     );
 
-    // --- 6. Animation Loop ---
+    // --- 7. Animation Loop ---
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
-
-      if (isRotating && modelRef.current) {
-        modelRef.current.rotation.y += 0.005;
+      
+      // Update controls (required for damping and auto-rotation)
+      if (controlsRef.current) {
+        controlsRef.current.update();
       }
 
       renderer.render(scene, camera);
     };
     animate();
 
-    // --- 7. Resize Handler ---
+    // --- 8. Resize Handler ---
     const handleResize = () => {
       if (!mountRef.current) return;
-      const width = mountRef.current.clientWidth;
-      const height = mountRef.current.clientHeight;
-
-      camera.aspect = width / height;
+      const w = mountRef.current.clientWidth;
+      const h = mountRef.current.clientHeight;
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
+      renderer.setSize(w, h);
     };
     window.addEventListener("resize", handleResize);
 
-    // --- Cleanup ---
     return () => {
       window.removeEventListener("resize", handleResize);
-      if (animationIdRef.current) {
-        cancelAnimationFrame(animationIdRef.current);
-      }
-      if (mountRef.current && renderer.domElement) {
+      if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
+      if (mountRef.current && renderer.domElement && mountRef.current.contains(renderer.domElement)) {
         mountRef.current.removeChild(renderer.domElement);
       }
       renderer.dispose();
-      // Dispose of scene contents to prevent memory leaks
-      scene.traverse((object) => {
-        if (object.isMesh) {
-          object.geometry.dispose();
-          if (object.material.isMaterial) {
-            object.material.dispose();
-          }
+      dracoLoader.dispose();
+      controls.dispose(); // Cleanup controls
+      scene.traverse((o) => {
+        if (o.isMesh) {
+          o.geometry.dispose();
+          if (o.material.isMaterial) o.material.dispose();
         }
       });
     };
-  }, [modelUrl]); // Re-run if URL changes (removed isRotating to prevent scene reload on toggle)
+  }, [modelUrl, isFullView]); // Re-run if these change
 
-  const handleRotationToggle = () => {
-    setIsRotating(!isRotating);
-  };
-
-  const handleReset = () => {
-    if (modelRef.current) {
-      modelRef.current.rotation.set(0, 0, 0);
+  // Sync auto-rotation state with controls
+  useEffect(() => {
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = autoRotate;
     }
-  };
+  }, [autoRotate]);
 
   return (
-    <div className="relative w-full h-full bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg overflow-hidden border border-slate-200">
+    <div className={`relative w-full h-full rounded-lg overflow-hidden ${isFullView ? '' : 'bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200'}`}>
       {/* 3D Canvas Container */}
-      <div ref={mountRef} className="w-full h-full" />
+      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
       {/* Loading Overlay */}
       {isLoading && (
@@ -277,41 +302,90 @@ const Model3DViewer = ({ modelUrl, equipmentName }) => {
         </div>
       )}
 
-      {/* Badge */}
-      <div className="absolute top-2 left-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-sm flex items-center gap-1">
-        <Box className="w-3 h-3" />
-        3D MODEL
-      </div>
+      {/* Controls UI */}
+      {!isLoading && !loadError && (
+        <>
+          {/* Top Left Badge */}
+          <div className="absolute top-2 left-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-sm flex items-center gap-1 pointer-events-none z-20">
+            <Box className="w-3 h-3" />
+            {isFullView ? "INTERACTIVE MODE" : "3D VIEW"}
+          </div>
 
-      {/* Controls */}
-      <div className="absolute bottom-2 right-2 flex gap-2 z-20">
-        <button
-          onClick={handleRotationToggle}
-          className="p-2 bg-white/90 hover:bg-white rounded-lg shadow-md transition-all border border-slate-200"
-          title={isRotating ? "Pause Rotation" : "Resume Rotation"}
-        >
-          <Activity
-            className={`w-4 h-4 text-slate-700 ${
-              isRotating ? "animate-pulse" : ""
-            }`}
-          />
-        </button>
-        <button
-          onClick={handleReset}
-          className="p-2 bg-white/90 hover:bg-white rounded-lg shadow-md transition-all border border-slate-200"
-          title="Reset View"
-        >
-          <Box className="w-4 h-4 text-slate-700" />
-        </button>
-      </div>
+          {/* Bottom Controls */}
+          <div className="absolute bottom-2 right-2 flex gap-2 z-20">
+            <button
+              onClick={() => setAutoRotate(!autoRotate)}
+              className="p-2 bg-white/90 hover:bg-white rounded-lg shadow-md transition-all border border-slate-200"
+              title={autoRotate ? "Pause Rotation" : "Auto Rotate"}
+            >
+              <Activity
+                className={`w-4 h-4 text-slate-700 ${autoRotate ? "animate-pulse" : ""}`}
+              />
+            </button>
+            
+            <button
+              onClick={() => {
+                if(controlsRef.current) controlsRef.current.reset();
+              }}
+              className="p-2 bg-white/90 hover:bg-white rounded-lg shadow-md transition-all border border-slate-200"
+              title="Reset View"
+            >
+              <Box className="w-4 h-4 text-slate-700" />
+            </button>
 
-      {/* Model Info */}
-      <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[9px] px-2 py-1 rounded max-w-[180px] truncate">
+            {/* Expand Button (Only shown in small view) */}
+            {!isFullView && onExpand && (
+              <button
+                onClick={onExpand}
+                className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-md transition-all border border-indigo-700"
+                title="Full Screen Mode"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Model Name Label */}
+      <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[9px] px-2 py-1 rounded max-w-[180px] truncate pointer-events-none z-20">
         {equipmentName}
       </div>
     </div>
   );
 };
+
+// ==========================================
+// COMPONENT: Full Screen Modal for 3D View
+// ==========================================
+const FullScreenModelModal = ({ isOpen, onClose, modelUrl, title }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200">
+      {/* Close Button */}
+      <button 
+        onClick={onClose}
+        className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-[60]"
+      >
+        <X className="w-8 h-8" />
+      </button>
+
+      {/* Content Container - UPDATED: bg-gray-900 instead of bg-slate-900 */}
+      <div className="w-[90vw] h-[85vh] bg-gray-900 rounded-xl overflow-hidden shadow-2xl relative border border-gray-700">
+        <Model3DViewer 
+          modelUrl={modelUrl} 
+          equipmentName={title} 
+          isFullView={true} 
+        />
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// MAIN PAGE COMPONENT
+// ==========================================
 
 // Helper to find qualification data based on equipment name
 const getQualificationData = (name) => {
@@ -447,8 +521,10 @@ export default function LabAnalyticsPage() {
 
   // --- AUTHENTICATION STATE ---
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [selectedEquipmentForAuth, setSelectedEquipmentForAuth] =
-    useState(null);
+  const [selectedEquipmentForAuth, setSelectedEquipmentForAuth] = useState(null);
+
+  // --- MODEL MODAL STATE ---
+  const [selectedModel, setSelectedModel] = useState(null); // { url, title }
 
   // --- STUDENT NAMES STATE ---
   const [studentNames, setStudentNames] = useState({});
@@ -846,6 +922,14 @@ export default function LabAnalyticsPage() {
         equipmentId={selectedEquipmentForAuth?.id}
         equipmentName={selectedEquipmentForAuth?.name}
         onAuthSuccess={handleAuthSuccess}
+      />
+
+      {/* --- 3D FULL SCREEN MODAL --- */}
+      <FullScreenModelModal 
+        isOpen={!!selectedModel}
+        onClose={() => setSelectedModel(null)}
+        modelUrl={selectedModel?.url}
+        title={selectedModel?.title}
       />
 
       {/* Header */}
@@ -1352,10 +1436,11 @@ export default function LabAnalyticsPage() {
                   className="bg-indigo-50/30 rounded-xl border border-indigo-100 overflow-hidden flex flex-col md:flex-row"
                 >
                   {/* 3D Model Viewer Section - Left Side */}
-                  <div className="w-full md:w-2/5 h-[280px] md:h-[320px] bg-slate-100">
+                  <div className="w-full md:w-2/5 h-[280px] md:h-[320px] bg-slate-100 relative group">
                     <Model3DViewer
                       modelUrl={item.modelUrl}
                       equipmentName={item.title}
+                      onExpand={() => setSelectedModel({ url: item.modelUrl, title: item.title })}
                     />
                   </div>
                   {/* Qualification Info Section - Right Side */}
@@ -1365,7 +1450,6 @@ export default function LabAnalyticsPage() {
                         {item.title}
                       </h4>
 
-                      {/* FIXED: Added the missing opening <a> tag here */}
                       <a
                         href={item.url}
                         target="_blank"
