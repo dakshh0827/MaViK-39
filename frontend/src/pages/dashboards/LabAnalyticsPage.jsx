@@ -28,8 +28,8 @@ import {
   TrendingUp,
   TrendingDown,
   Activity,
-  ExternalLink,
-  BookOpen, // New Icon
+  Lock,
+  Unlock,
 } from "lucide-react";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import api from "../../lib/axios";
@@ -54,65 +54,6 @@ const FALLBACK_COLORS = [
   "#84CC16",
   "#06B6D4",
 ];
-
-// --- QUALIFICATION DATA DATABASE ---
-// Keys are simplified to single words to ensure they match your equipment names better.
-const QUALIFICATION_DB = {
-  lathe: {
-    title: "CNC Lathe Operator",
-    url: "https://nqr.gov.in/qualifications/11405",
-    stats: {
-      Theory: 40,
-      Practical: 80,
-      EmployabilitySkills: "00",
-      "OJT(Mandatory)": "00",
-    },
-  },
-  drill: {
-    title: "Bench Drill Operator",
-    url: "https://nqr.gov.in/qualifications/12082",
-    stats: {
-      Theory: 60,
-      Practical: 150,
-      EmployabilitySkills: 30,
-      "OJT(Mandatory)": 150,
-    },
-  },
-  weld: {
-    title: "Arc Welding Specialist",
-    url: "https://nqr.gov.in/qualifications/14234",
-    stats: {
-      Theory: 120,
-      Practical: 180,
-      EmployabilitySkills: 30,
-      "OJT(Mandatory)": 60,
-    },
-  },
-  laser: {
-    title: "Laser Engraver",
-    url: "https://nqr.gov.in/qualifications/13977",
-    stats: {
-      Theory: 150,
-      Practical: 180,
-      EmployabilitySkills: 60,
-      "OJT(Mandatory)": 180,
-    },
-  },
-};
-
-// Helper to find qualification data based on equipment name
-const getQualificationData = (name) => {
-  if (!name) return null;
-  const lowerName = name.toLowerCase();
-
-  // Debug log to help you see what names are being checked in Console
-  // console.log("Checking equipment name:", lowerName);
-
-  for (const [key, data] of Object.entries(QUALIFICATION_DB)) {
-    if (lowerName.includes(key)) return data;
-  }
-  return null;
-};
 
 // --- HELPER: Date + Time ---
 const formatTimestamp = (isoString) => {
@@ -144,12 +85,7 @@ const getISOStandard = (department) => {
 
 const PredictiveMaintenanceCard = ({ equipment, prediction }) => {
   if (!prediction) return null;
-
-  // FIX: Handle percentage calculation safely inside variable
-  let rawProb = prediction.probability || 0;
-  // If probability is decimal (0.85), convert to 85. If already 85, keep it.
-  const probability = rawProb <= 1 ? rawProb * 100 : rawProb;
-
+  const probability = prediction.probability || 0;
   const daysUntil = prediction.daysUntilMaintenance || 0;
   const needsMaintenance = prediction.prediction === 1;
 
@@ -276,7 +212,7 @@ export default function LabAnalyticsPage() {
   }, []);
 
   // ========================================
-  // 🆕 HANDLE LIVE UPDATES (Temp + Vib)
+  // 🆕 HANDLE LIVE UPDATES (Status + Auth)
   // ========================================
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
@@ -287,12 +223,17 @@ export default function LabAnalyticsPage() {
     setLiveUpdates((prev) => ({
       ...prev,
       [equipmentId]: {
+        // Metric Updates
         temperature: data.temperature,
-        vibration: data.vibration, // CAPTURE VIBRATION
+        vibration: data.vibration,
         healthScore: data.healthScore,
         efficiency: data.efficiency,
         status: data.status,
         energyConsumption: data.energyConsumption,
+        // Authentication Updates
+        isLocked: data.isLocked,
+        currentUserId: data.currentUserId,
+
         timestamp: data.readingTimestamp || new Date().toISOString(),
         updatedAt: new Date(),
       },
@@ -306,6 +247,13 @@ export default function LabAnalyticsPage() {
         if (eq.id === equipmentId) {
           return {
             ...eq,
+            // Merge Auth State
+            isLocked: data.isLocked !== undefined ? data.isLocked : eq.isLocked,
+            currentUserId:
+              data.currentUserId !== undefined
+                ? data.currentUserId
+                : eq.currentUserId,
+
             status: {
               ...eq.status,
               status: data.status || eq.status?.status,
@@ -315,7 +263,7 @@ export default function LabAnalyticsPage() {
             analyticsParams: {
               ...eq.analyticsParams,
               temperature: data.temperature ?? eq.analyticsParams?.temperature,
-              vibration: data.vibration ?? eq.analyticsParams?.vibration, // UPDATE VIBRATION
+              vibration: data.vibration ?? eq.analyticsParams?.vibration,
               efficiency: data.efficiency ?? eq.analyticsParams?.efficiency,
               energyConsumption:
                 data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
@@ -355,7 +303,6 @@ export default function LabAnalyticsPage() {
         const analyticsResponse = await api.get(
           `/monitoring/lab-analytics/${labId}`
         );
-        console.log("📊 Loaded Lab Data:", analyticsResponse.data.data); // DEBUG LOG
         setLabData(analyticsResponse.data.data);
 
         try {
@@ -378,6 +325,24 @@ export default function LabAnalyticsPage() {
       fetchData();
     }
   }, [labId]);
+
+  // --- AUTH HANDLERS ---
+  const handleAuthClick = (equipment) => {
+    if (!equipment.isLocked) return; // Prevent clicking if already unlocked
+    setSelectedEquipmentForAuth(equipment);
+    setShowAuthModal(true);
+  };
+
+  const handleAuthSuccess = (data) => {
+    // The socket should handle the state update, but we can do a quick optimistic update or refresh
+    console.log("Authentication Successful:", data);
+
+    // Optional: Refresh full data to ensure cascading unlocks are reflected if socket is slow
+    api
+      .get(`/monitoring/lab-analytics/${labId}`)
+      .then((res) => setLabData(res.data.data))
+      .catch(console.error);
+  };
 
   // --- CHART DATA PREPARATION ---
   const chartData = useMemo(() => {
@@ -484,9 +449,7 @@ export default function LabAnalyticsPage() {
       (sum, item) => sum + (item.prediction?.probability || 0),
       0
     );
-    const avg = totalConfidence / predictiveData.length;
-    // Normalize safely to 0-100
-    return (avg <= 1 ? avg * 100 : avg).toFixed(1);
+    return (totalConfidence / predictiveData.length).toFixed(1);
   }, [predictiveData]);
 
   if (isLoading)
@@ -734,7 +697,7 @@ export default function LabAnalyticsPage() {
           </div>
         )}
 
-        {/* Live Equipment Table */}
+        {/* Live Equipment Table with AUTH Controls */}
         {labData.equipment && labData.equipment.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
@@ -755,18 +718,14 @@ export default function LabAnalyticsPage() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
                       Equipment
                     </th>
-                    {/* ADDED COLUMN: Qualification */}
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Qualification
+                      Access Control
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
                       Health
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
-                      Efficiency
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
                       Temp
@@ -808,6 +767,23 @@ export default function LabAnalyticsPage() {
                               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
                             )}
                           </div>
+                        </td>
+
+                        {/* QUALIFICATION LINK CELL */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {qualification ? (
+                            <a
+                              href={qualification.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              View NQR
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          )}
                         </td>
 
                         {/* NEW CELL: Qualification Link */}
@@ -854,22 +830,7 @@ export default function LabAnalyticsPage() {
                             %
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span
-                            className={
-                              isFresh ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {(
-                              live?.efficiency ??
-                              eq.analyticsParams?.efficiency ??
-                              0
-                            ).toFixed(0)}
-                            %
-                          </span>
-                        </td>
 
-                        {/* TEMPERATURE CELL */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           <span
                             className={
@@ -910,51 +871,6 @@ export default function LabAnalyticsPage() {
                   })}
                 </tbody>
               </table>
-            </div>
-          </div>
-        )}
-
-        {/* 🆕 NEW SECTION: Qualification Standards & Data */}
-        {uniqueQualifications.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <BookOpen className="text-indigo-600 w-5 h-5" />
-              Qualification Standards & Curriculum
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-              {uniqueQualifications.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-indigo-50/50 rounded-lg border border-indigo-100 p-4"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <h4 className="font-semibold text-gray-900 text-sm">
-                      {item.title}
-                    </h4>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-800"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  </div>
-                  <div className="space-y-2">
-                    {Object.entries(item.stats).map(([label, value]) => (
-                      <div
-                        key={label}
-                        className="flex justify-between items-center text-sm border-b border-indigo-100 last:border-0 py-1"
-                      >
-                        <span className="text-gray-600 font-medium">
-                          {label}
-                        </span>
-                        <span className="text-gray-900 font-bold">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         )}
