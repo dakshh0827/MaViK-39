@@ -208,6 +208,7 @@ class FirebaseService {
         temperature,
         vibration,
         energyConsumption: 0.0,
+        firebaseDeviceId: firebaseDeviceId,
         readingTimestamp: readingTimestamp.toISOString(),
         updatedAt: new Date()
       });

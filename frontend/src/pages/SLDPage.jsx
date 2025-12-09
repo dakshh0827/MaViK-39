@@ -2,7 +2,7 @@
  * =====================================================
  * frontend/src/pages/SLDPage.jsx
  * =====================================================
- * Updated: Real-time Connection Status (ON/OFF) based on 30s timeout
+ * Updated: Hardcoded power for EQ-0099
  */
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useAuthStore } from "../stores/authStore";
@@ -51,17 +51,22 @@ const ROOT_HEIGHT = 150;
 const CANVAS_PADDING = 50;
 const BUS_OFFSET = 60;
 
- const STATUS_MAPPING = {
-    'Laser_Engraver_01': [
-      'CNC_Machine_01',      // Replace with actual equipment IDs
-      'Welding_Station_01',  // Replace with actual equipment IDs
-      '3D_Printer_01'        // Replace with actual equipment IDs
-    ]
-  };
+// --- CONFIGURATION ---
+const MASTER_FIREBASE_ID = 'Laser_Engraver_01';
+const MAPPED_SLAVES_FIREBASE_IDS = [
+  'CNC_Machine_01',
+  'Welding_Station_01',
+  '3D_Printer_01'
+];
 
-  const isMappedEquipment = (equipmentId) => {
-  if (equipmentId === 'Laser_Engraver_01') return true;
-  return STATUS_MAPPING['Laser_Engraver_01']?.includes(equipmentId) || false;
+const isMappedGroup = (equipment) => {
+  if (!equipment) return false;
+  const fid = equipment.firebaseDeviceId;
+  if (fid === MASTER_FIREBASE_ID || MAPPED_SLAVES_FIREBASE_IDS.includes(fid)) {
+    return true;
+  }
+  const eid = equipment.equipmentId;
+  return eid === MASTER_FIREBASE_ID || MAPPED_SLAVES_FIREBASE_IDS.includes(eid);
 };
 
 export default function SLDPage() {
@@ -106,15 +111,50 @@ export default function SLDPage() {
   const [selectedEquipmentForModal, setSelectedEquipmentForModal] =
     useState(null);
 
-  // Socket state
+  // Socket & Real-time State
   const [socket, setSocket] = useState(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
-  const [liveEquipmentData, setLiveEquipmentData] = useState({});
+  const [liveUpdates, setLiveUpdates] = useState({}); 
 
   // Time state for "Alive" check
   const [currentTime, setCurrentTime] = useState(Date.now());
 
   const trainerInitializedRef = useRef(false);
+
+  // --- HANDLE UPDATES (Defined with useCallback to be stable) ---
+  const handleEquipmentUpdate = useCallback((data) => {
+    const id = data.id; 
+    const equipmentId = data.equipmentId;
+    const firebaseDeviceId = data.firebaseDeviceId;
+
+    if (!id && !equipmentId) return;
+
+    setLiveUpdates((prev) => {
+      // Determine energy consumption (Simulated override for EQ-0099)
+      let energyValue = data.energyConsumption ?? (prev[id]?.energyConsumption || prev[equipmentId]?.energyConsumption);
+      
+      // ✅ FORCE ENERGY FOR EQ-0099
+      if (equipmentId === 'EQ-0099') {
+        energyValue = 0.25;
+      }
+
+      const updateEntry = {
+        ...data,
+        updatedAt: new Date(),
+        temperature: data.temperature ?? (prev[id]?.temperature || prev[equipmentId]?.temperature),
+        vibration: data.vibration ?? (prev[id]?.vibration || prev[equipmentId]?.vibration),
+        energyConsumption: energyValue, // Use the (potentially overridden) value
+      };
+
+      const newState = { ...prev };
+      
+      if (id) newState[id] = updateEntry;
+      if (equipmentId) newState[equipmentId] = updateEntry;
+      if (firebaseDeviceId) newState[firebaseDeviceId] = updateEntry;
+
+      return newState;
+    });
+  }, []);
 
   // --- SOCKET.IO CONNECTION ---
   useEffect(() => {
@@ -177,82 +217,66 @@ export default function SLDPage() {
       socketInstance.removeAllListeners();
       socketInstance.disconnect();
     };
-  }, []);
+  }, [handleEquipmentUpdate]); 
 
   // --- ALIVE CHECK INTERVAL ---
-  // Update currentTime every 2 seconds to trigger re-renders for timeout logic
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
-    }, 2000);
+    }, 1000); 
     return () => clearInterval(interval);
   }, []);
 
- const handleEquipmentUpdate = (data) => {
-    const equipmentId = data.equipmentId || data.id;
-    if (!equipmentId) return;
-
-    const updateData = {
-      ...data,
-      updatedAt: new Date(), // Important for timeout check
-    };
-
-    setLiveEquipmentData((prev) => {
-      const newData = {
-        ...prev,
-        [equipmentId]: updateData,
-      };
-
-      // If this equipment has mapped equipment, update them too
-      if (STATUS_MAPPING[equipmentId]) {
-        STATUS_MAPPING[equipmentId].forEach(mappedId => {
-          newData[mappedId] = {
-            ...updateData,
-            equipmentId: mappedId,
-            id: mappedId,
-          };
-        });
-      }
-
-      return newData;
-    });
-  };
-
+  // --- MERGE LIVE DATA & CALCULATE LIVENESS ---
   const equipmentWithLiveData = useMemo(() => {
     if (!equipment || equipment.length === 0) return [];
 
-    return equipment.map((eq) => {
-      const liveData = liveEquipmentData[eq.id];
+    const masterData = liveUpdates[MASTER_FIREBASE_ID];
+    let isMasterAlive = false;
+    
+    if (masterData && masterData.updatedAt) {
+      const lastUpdate = new Date(masterData.updatedAt).getTime();
+      if (currentTime - lastUpdate < 30000) {
+        isMasterAlive = true;
+      }
+    }
 
-      // Determine Alive Status
+    return equipment.map((eq) => {
+      const liveData = liveUpdates[eq.id] || liveUpdates[eq.equipmentId] || liveUpdates[eq.firebaseDeviceId];
+      
+      const isMapped = isMappedGroup(eq);
+
       let isAlive = false;
-      if (liveData && liveData.updatedAt) {
-        const lastUpdate = new Date(liveData.updatedAt).getTime();
-        if (currentTime - lastUpdate < 30000) {
-          // 30 Seconds Threshold
-          isAlive = true;
+
+      if (isMapped) {
+        isAlive = isMasterAlive;
+      } else {
+        if (liveData && liveData.updatedAt) {
+          const lastUpdate = new Date(liveData.updatedAt).getTime();
+          if (currentTime - lastUpdate < 30000) {
+            isAlive = true;
+          }
         }
       }
 
-      if (!liveData) return { ...eq, isAlive: false };
+      const effectiveData = isMapped && isMasterAlive ? (liveUpdates[MASTER_FIREBASE_ID] || liveData) : liveData;
 
       return {
         ...eq,
-        isAlive,
+        isAlive, 
         status: {
           ...eq.status,
-          status: liveData.status || eq.status?.status,
-          temperature: liveData.temperature ?? eq.status?.temperature,
-          vibration: liveData.vibration ?? eq.status?.vibration,
-          energyConsumption:
-            liveData.energyConsumption ?? eq.status?.energyConsumption,
-          healthScore: liveData.healthScore ?? eq.status?.healthScore,
+          status: isAlive ? "ONLINE" : "OFFLINE", 
+          temperature: effectiveData?.temperature ?? eq.status?.temperature,
+          vibration: effectiveData?.vibration ?? eq.status?.vibration,
+          energyConsumption: effectiveData?.energyConsumption ?? eq.status?.energyConsumption,
+          healthScore: effectiveData?.healthScore ?? eq.status?.healthScore,
         },
       };
     });
-  }, [equipment, liveEquipmentData, currentTime]);
+  }, [equipment, liveUpdates, currentTime]);
 
-  // --- DATA LOADING LOGIC ---
+  // --- DATA LOADING LOGIC (Standard) ---
   const loadLabData = useCallback(
     async (labId) => {
       if (!labId || labId === "all") return;
@@ -519,9 +543,8 @@ export default function SLDPage() {
       const endX = node.x + NODE_WIDTH / 2;
       const endY = node.y;
 
-      // Determine Connection Color based on "Alive" status
       const isActive = node.equipment.isAlive;
-      const color = isActive ? "#22c55e" : "#94a3b8"; // Green if alive, Gray if offline
+      const color = isActive ? "#22c55e" : "#94a3b8"; 
 
       return {
         startX,
@@ -530,7 +553,7 @@ export default function SLDPage() {
         endX,
         endY,
         color,
-        animated: isActive, // Animate only if active
+        animated: isActive,
       };
     });
 
@@ -597,7 +620,7 @@ export default function SLDPage() {
 
   return (
     <div className="space-y-6">
-      {/* HEADER & FILTERS */}
+      {/* HEADER */}
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3">
@@ -625,16 +648,16 @@ export default function SLDPage() {
                 <>
                   <button
                     onClick={saveLayout}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
                     disabled={!hasUnsavedChanges || isSaving}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
                   >
                     <Save className="w-4 h-4" />
                     {isSaving ? "Saving..." : "Save Layout"}
                   </button>
                   <button
                     onClick={toggleEditMode}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
                     disabled={isSaving}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
                   >
                     <X className="w-4 h-4" />
                     Exit Edit
@@ -666,8 +689,8 @@ export default function SLDPage() {
                 <select
                   value={selectedInstitute}
                   onChange={handleInstituteChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={isLoading}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="all">All Institutes</option>
                   {availableInstitutes.map((inst) => (
@@ -679,8 +702,8 @@ export default function SLDPage() {
                 <select
                   value={selectedDepartment}
                   onChange={handleDepartmentChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={isLoading || availableDepartments.length === 0}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="all">All Departments</option>
                   {availableDepartments.map((dept) => (
@@ -694,8 +717,8 @@ export default function SLDPage() {
             <select
               value={selectedLab}
               onChange={handleLabChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={isLoading || availableLabs.length === 0}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">Select a Lab</option>
               {availableLabs.map((lab) => (
@@ -721,15 +744,15 @@ export default function SLDPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => adjustColumns(-1)}
-                className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                 disabled={numColumns <= 1}
+                className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
               >
                 <Minus className="w-4 h-4" />
               </button>
               <button
                 onClick={() => adjustColumns(1)}
-                className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                 disabled={numColumns >= 8}
+                className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -746,9 +769,8 @@ export default function SLDPage() {
         </div>
       )}
 
-      {/* CANVAS / DIAGRAM AREA */}
+      {/* CANVAS */}
       <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-sm border border-gray-200 p-8 overflow-auto flex justify-center relative">
-        {/* TOTAL EQUIPMENT COUNT */}
         {selectedLab !== "all" && equipment.length > 0 && (
           <div className="absolute top-4 right-4 z-30 pointer-events-none">
             <div className="bg-white/90 backdrop-blur-sm border border-gray-300 px-4 py-2 rounded-lg shadow-md flex items-center gap-2 pointer-events-auto">
@@ -901,7 +923,7 @@ export default function SLDPage() {
                 onPositionChange={handlePositionChange}
                 onOpenModal={setSelectedEquipmentForModal}
                 padding={CANVAS_PADDING}
-                isMapped={isMappedEquipment(node.equipment.equipmentId)}
+                isMapped={isMappedGroup(node.equipment)} // Check entire equipment object for firebaseId
                 isRealTimeActive={node.equipment.isAlive}
               />
             ))}
@@ -909,7 +931,7 @@ export default function SLDPage() {
         )}
       </div>
 
-      {/* Equipment Details Modal */}
+      {/* MODAL */}
       {selectedEquipmentForModal && (
         <EquipmentDetailsModal
           equipment={selectedEquipmentForModal}
@@ -940,7 +962,7 @@ const STATUS_CONFIG_MODAL = {
 const getDisplayStatus_Modal = (backendStatus) => {
   if (!backendStatus) return "OFFLINE";
   const status = backendStatus.toUpperCase();
-  if (status === "OPERATIONAL" || status === "IN_USE" || status === "IN_CLASS")
+  if (status === "OPERATIONAL" || status === "IN_USE" || status === "IN_CLASS" || status === "ONLINE")
     return "ONLINE";
   return "OFFLINE";
 };
