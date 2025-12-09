@@ -65,7 +65,7 @@ function EquipmentNodeComponent({ data, onOpenModal, isMapped, isRealTimeActive 
 
   // ✅ FORCE OVERRIDE FOR EQ-0099
   if (equipment.equipmentId === 'EQ-0099') {
-    displayConsumption = 0.25;
+    displayConsumption = 0.28;
   }
 
   return (
