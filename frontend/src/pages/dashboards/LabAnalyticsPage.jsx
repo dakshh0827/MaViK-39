@@ -28,11 +28,14 @@ import {
   TrendingUp,
   TrendingDown,
   Activity,
+  ExternalLink,
+  BookOpen,
   Lock,
   Unlock,
 } from "lucide-react";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import api from "../../lib/axios";
+import BiometricAuthModal from "../../components/biometric/BiometricAuthModal";
 
 // --- CONSTANTS ---
 const STATUS_COLORS = {
@@ -54,6 +57,61 @@ const FALLBACK_COLORS = [
   "#84CC16",
   "#06B6D4",
 ];
+
+// --- QUALIFICATION DATA DATABASE ---
+const QUALIFICATION_DB = {
+  lathe: {
+    title: "CNC Lathe Operator",
+    url: "https://nqr.gov.in/qualifications/11405",
+    stats: {
+      Theory: 40,
+      Practical: 80,
+      EmployabilitySkills: "00",
+      "OJT(Mandatory)": "00",
+    },
+  },
+  drill: {
+    title: "Bench Drill Operator",
+    url: "https://nqr.gov.in/qualifications/12082",
+    stats: {
+      Theory: 60,
+      Practical: 150,
+      EmployabilitySkills: 30,
+      "OJT(Mandatory)": 150,
+    },
+  },
+  weld: {
+    title: "Arc Welding Specialist",
+    url: "https://nqr.gov.in/qualifications/14234",
+    stats: {
+      Theory: 120,
+      Practical: 180,
+      EmployabilitySkills: 30,
+      "OJT(Mandatory)": 60,
+    },
+  },
+  laser: {
+    title: "Laser Engraver",
+    url: "https://nqr.gov.in/qualifications/13977",
+    stats: {
+      Theory: 150,
+      Practical: 180,
+      EmployabilitySkills: 60,
+      "OJT(Mandatory)": 180,
+    },
+  },
+};
+
+// Helper to find qualification data based on equipment name
+const getQualificationData = (name) => {
+  if (!name) return null;
+  const lowerName = name.toLowerCase();
+
+  for (const [key, data] of Object.entries(QUALIFICATION_DB)) {
+    if (lowerName.includes(key)) return data;
+  }
+  return null;
+};
 
 // --- HELPER: Date + Time ---
 const formatTimestamp = (isoString) => {
@@ -85,7 +143,10 @@ const getISOStandard = (department) => {
 
 const PredictiveMaintenanceCard = ({ equipment, prediction }) => {
   if (!prediction) return null;
-  const probability = prediction.probability || 0;
+
+  let rawProb = prediction.probability || 0;
+  const probability = rawProb <= 1 ? rawProb * 100 : rawProb;
+
   const daysUntil = prediction.daysUntilMaintenance || 0;
   const needsMaintenance = prediction.prediction === 1;
 
@@ -157,8 +218,14 @@ export default function LabAnalyticsPage() {
   const [liveUpdates, setLiveUpdates] = useState({});
   const [isSocketConnected, setIsSocketConnected] = useState(false);
 
+  // --- AUTHENTICATION STATE ---
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [selectedEquipmentForAuth, setSelectedEquipmentForAuth] = useState(null);
+
   // --- SOCKET.IO CONNECTION ---
   useEffect(() => {
+    console.log("🔌 Setting up Socket.IO connection...");
+
     let token = null;
     try {
       const authStorage = localStorage.getItem("auth-storage");
@@ -170,7 +237,10 @@ export default function LabAnalyticsPage() {
       console.error("❌ Failed to parse auth token:", e);
     }
 
-    if (!token) return;
+    if (!token) {
+      console.error("❌ No access token found in localStorage");
+      return;
+    }
 
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
     const socketUrl = apiUrl.replace("/api", "");
@@ -184,14 +254,17 @@ export default function LabAnalyticsPage() {
     });
 
     socketInstance.on("connect", () => {
+      console.log("✅ Socket.IO connected!", socketInstance.id);
       setIsSocketConnected(true);
     });
 
-    socketInstance.on("disconnect", () => {
+    socketInstance.on("disconnect", (reason) => {
+      console.log("❌ Socket.IO disconnected:", reason);
       setIsSocketConnected(false);
     });
 
-    socketInstance.on("connect_error", () => {
+    socketInstance.on("connect_error", (error) => {
+      console.error("❌ Socket.IO connection error:", error.message);
       setIsSocketConnected(false);
     });
 
@@ -206,13 +279,14 @@ export default function LabAnalyticsPage() {
     setSocket(socketInstance);
 
     return () => {
+      console.log("🔌 Cleaning up Socket.IO connection");
       socketInstance.removeAllListeners();
       socketInstance.disconnect();
     };
   }, []);
 
   // ========================================
-  // 🆕 HANDLE LIVE UPDATES (Status + Auth)
+  // 🆕 HANDLE LIVE UPDATES (Status + Auth + Metrics)
   // ========================================
   const handleEquipmentUpdate = (data) => {
     const equipmentId = data.equipmentId || data.id;
@@ -230,10 +304,12 @@ export default function LabAnalyticsPage() {
         efficiency: data.efficiency,
         status: data.status,
         energyConsumption: data.energyConsumption,
+        
         // Authentication Updates
         isLocked: data.isLocked,
         currentUserId: data.currentUserId,
 
+        // Timestamp
         timestamp: data.readingTimestamp || new Date().toISOString(),
         updatedAt: new Date(),
       },
@@ -249,10 +325,7 @@ export default function LabAnalyticsPage() {
             ...eq,
             // Merge Auth State
             isLocked: data.isLocked !== undefined ? data.isLocked : eq.isLocked,
-            currentUserId:
-              data.currentUserId !== undefined
-                ? data.currentUserId
-                : eq.currentUserId,
+            currentUserId: data.currentUserId !== undefined ? data.currentUserId : eq.currentUserId,
 
             status: {
               ...eq.status,
@@ -265,8 +338,7 @@ export default function LabAnalyticsPage() {
               temperature: data.temperature ?? eq.analyticsParams?.temperature,
               vibration: data.vibration ?? eq.analyticsParams?.vibration,
               efficiency: data.efficiency ?? eq.analyticsParams?.efficiency,
-              energyConsumption:
-                data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
+              energyConsumption: data.energyConsumption ?? eq.analyticsParams?.energyConsumption,
             },
           };
         }
@@ -303,6 +375,7 @@ export default function LabAnalyticsPage() {
         const analyticsResponse = await api.get(
           `/monitoring/lab-analytics/${labId}`
         );
+        console.log("📊 Loaded Lab Data:", analyticsResponse.data.data);
         setLabData(analyticsResponse.data.data);
 
         try {
@@ -334,14 +407,12 @@ export default function LabAnalyticsPage() {
   };
 
   const handleAuthSuccess = (data) => {
-    // The socket should handle the state update, but we can do a quick optimistic update or refresh
     console.log("Authentication Successful:", data);
-
+    
     // Optional: Refresh full data to ensure cascading unlocks are reflected if socket is slow
-    api
-      .get(`/monitoring/lab-analytics/${labId}`)
-      .then((res) => setLabData(res.data.data))
-      .catch(console.error);
+    api.get(`/monitoring/lab-analytics/${labId}`)
+       .then(res => setLabData(res.data.data))
+       .catch(console.error);
   };
 
   // --- CHART DATA PREPARATION ---
@@ -365,8 +436,7 @@ export default function LabAnalyticsPage() {
           temperature: live.temperature ?? eq.analyticsParams?.temperature,
           vibration: live.vibration ?? eq.analyticsParams?.vibration,
           efficiency: live.efficiency ?? eq.analyticsParams?.efficiency,
-          energyConsumption:
-            live.energyConsumption ?? eq.analyticsParams?.energyConsumption,
+          energyConsumption: live.energyConsumption ?? eq.analyticsParams?.energyConsumption,
         },
       };
     });
@@ -449,7 +519,8 @@ export default function LabAnalyticsPage() {
       (sum, item) => sum + (item.prediction?.probability || 0),
       0
     );
-    return (totalConfidence / predictiveData.length).toFixed(1);
+    const avg = totalConfidence / predictiveData.length;
+    return (avg <= 1 ? avg * 100 : avg).toFixed(1);
   }, [predictiveData]);
 
   if (isLoading)
@@ -476,6 +547,15 @@ export default function LabAnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gray-200 flex flex-col">
+      {/* --- AUTH MODAL --- */}
+      <BiometricAuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        equipmentId={selectedEquipmentForAuth?.id}
+        equipmentName={selectedEquipmentForAuth?.name}
+        onAuthSuccess={handleAuthSuccess}
+      />
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-5 sticky top-0 z-10 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -697,13 +777,15 @@ export default function LabAnalyticsPage() {
           </div>
         )}
 
-        {/* Live Equipment Table with AUTH Controls */}
+        {/* Live Equipment Table with AUTH Controls & Qualification */}
         {labData.equipment && labData.equipment.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">
-                Equipment Detail View (Real-time Metrics)
-              </h3>
+              <div className="flex flex-col">
+                <h3 className="font-bold text-gray-900">Equipment Access & Metrics</h3>
+                <span className="text-xs text-gray-500">Click on 'Locked' button to authenticate via Biometrics</span>
+              </div>
+              
               {Object.keys(liveUpdates).length > 0 && (
                 <span className="text-xs text-green-600 flex items-center gap-1 font-bold animate-pulse">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -717,6 +799,9 @@ export default function LabAnalyticsPage() {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
                       Equipment
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
+                      Qualification
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase bg-gray-50">
                       Access Control
@@ -745,11 +830,13 @@ export default function LabAnalyticsPage() {
                   {labData.equipment.map((eq) => {
                     const live = liveUpdates[eq.id];
                     const isFresh = live && new Date() - live.updatedAt < 5000;
-                    const displayTime =
-                      live?.timestamp || eq.status?.lastUsedAt;
+                    const displayTime = live?.timestamp || eq.status?.lastUsedAt;
 
                     // CHECK FOR QUALIFICATION DATA
                     const qualification = getQualificationData(eq.name);
+
+                    // Determine Lock State (Live update takes precedence, fallback to initial fetch)
+                    const isLocked = live?.isLocked !== undefined ? live.isLocked : eq.isLocked;
 
                     return (
                       <tr
@@ -786,20 +873,22 @@ export default function LabAnalyticsPage() {
                           )}
                         </td>
 
-                        {/* NEW CELL: Qualification Link */}
+                        {/* AUTHENTICATION / LOCK COLUMN */}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {qualification ? (
-                            <a
-                              href={qualification.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                          {isLocked ? (
+                            <button
+                                onClick={() => handleAuthClick(eq)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors border border-red-200 shadow-sm"
+                                title="Click to Authenticate"
                             >
-                              View NQR
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
+                                <Lock className="w-3.5 h-3.5" />
+                                LOCKED
+                            </button>
                           ) : (
-                            <span className="text-xs text-gray-400">N/A</span>
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold border border-green-200">
+                                <Unlock className="w-3.5 h-3.5" />
+                                UNLOCKED
+                            </div>
                           )}
                         </td>
 
@@ -845,7 +934,6 @@ export default function LabAnalyticsPage() {
                           </span>
                         </td>
 
-                        {/* VIBRATION CELL - UPDATED */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           <span
                             className={
@@ -871,6 +959,51 @@ export default function LabAnalyticsPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Qualification Standards & Data Section */}
+        {uniqueQualifications.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <BookOpen className="text-indigo-600 w-5 h-5" />
+              Qualification Standards & Curriculum
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              {uniqueQualifications.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="bg-indigo-50/50 rounded-lg border border-indigo-100 p-4"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <h4 className="font-semibold text-gray-900 text-sm">
+                      {item.title}
+                    </h4>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 hover:text-indigo-800"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries(item.stats).map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="flex justify-between items-center text-sm border-b border-indigo-100 last:border-0 py-1"
+                      >
+                        <span className="text-gray-600 font-medium">
+                          {label}
+                        </span>
+                        <span className="text-gray-900 font-bold">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
