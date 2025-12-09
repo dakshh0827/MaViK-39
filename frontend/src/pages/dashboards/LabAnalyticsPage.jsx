@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader"; // Import the Loader
 import {
   BarChart,
   Bar,
@@ -30,6 +31,7 @@ import {
   Activity,
   ExternalLink,
   BookOpen,
+  Loader2,
   Lock,
   Unlock,
   MapPin,
@@ -114,62 +116,97 @@ const Model3DViewer = ({ modelUrl, equipmentName }) => {
   const rendererRef = useRef(null);
   const modelRef = useRef(null);
   const animationIdRef = useRef(null);
+
   const [isRotating, setIsRotating] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Track loading state
 
   useEffect(() => {
     if (!mountRef.current) return;
 
-    // Scene setup
+    // --- 1. Scene Setup ---
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf8fafc);
     sceneRef.current = scene;
 
-    // Camera setup
+    // --- 2. Camera Setup ---
     const camera = new THREE.PerspectiveCamera(
       45,
       mountRef.current.clientWidth / mountRef.current.clientHeight,
       0.1,
       1000
     );
-    camera.position.set(0, 2, 5);
-    camera.lookAt(0, 0, 0);
+    // Initial position (will be adjusted when model loads)
+    camera.position.set(0, 0, 5);
     cameraRef.current = camera;
 
-    // Renderer setup
+    // --- 3. Renderer Setup ---
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(
       mountRef.current.clientWidth,
       mountRef.current.clientHeight
     );
     renderer.setPixelRatio(window.devicePixelRatio);
+    // improving color accuracy for models
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // --- 4. Lighting ---
+    // Ambient light (soft fill)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
 
-    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight1.position.set(5, 5, 5);
-    scene.add(directionalLight1);
+    // Main Directional Light (Sun)
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+    mainLight.position.set(5, 10, 7);
+    scene.add(mainLight);
 
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
-    directionalLight2.position.set(-5, 3, -5);
-    scene.add(directionalLight2);
+    // Back Light (Rim light to separate model from bg)
+    const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    backLight.position.set(-5, 5, -5);
+    scene.add(backLight);
 
-    // Placeholder geometry (will be replaced with OBJ loader)
-    // TODO: Replace this with OBJLoader when you add your models
-    const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x6366f1,
-      metalness: 0.3,
-      roughness: 0.4,
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-    modelRef.current = mesh;
+    // --- 5. GLB Loader Logic ---
+    const loader = new GLTFLoader();
+    setIsLoading(true);
 
-    // Animation loop
+    loader.load(
+      modelUrl,
+      (gltf) => {
+        const model = gltf.scene;
+
+        // -- Centering and Scaling Logic --
+        // 1. Calculate the bounding box of the model
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+
+        // 2. Reset model position to center it at 0,0,0
+        model.position.x += model.position.x - center.x;
+        model.position.y += model.position.y - center.y;
+        model.position.z += model.position.z - center.z;
+
+        // 3. Determine max dimension to adjust camera zoom
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        let cameraZ = Math.abs((maxDim / 2) * Math.tan(fov * 2));
+
+        // Add a multiplier to zoom out slightly (1.5x) so it doesn't touch edges
+        camera.position.z = cameraZ * 2.0;
+        camera.updateProjectionMatrix();
+
+        scene.add(model);
+        modelRef.current = model;
+        setIsLoading(false);
+      },
+      undefined, // onProgress (optional)
+      (error) => {
+        console.error("An error occurred loading the model:", error);
+        setIsLoading(false);
+      }
+    );
+
+    // --- 6. Animation Loop ---
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
 
@@ -181,7 +218,7 @@ const Model3DViewer = ({ modelUrl, equipmentName }) => {
     };
     animate();
 
-    // Handle resize
+    // --- 7. Resize Handler ---
     const handleResize = () => {
       if (!mountRef.current) return;
       const width = mountRef.current.clientWidth;
@@ -193,7 +230,7 @@ const Model3DViewer = ({ modelUrl, equipmentName }) => {
     };
     window.addEventListener("resize", handleResize);
 
-    // Cleanup
+    // --- Cleanup ---
     return () => {
       window.removeEventListener("resize", handleResize);
       if (animationIdRef.current) {
@@ -202,21 +239,24 @@ const Model3DViewer = ({ modelUrl, equipmentName }) => {
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
       }
-      geometry.dispose();
-      material.dispose();
       renderer.dispose();
+      // Dispose of scene contents to prevent memory leaks
+      scene.traverse((object) => {
+        if (object.isMesh) {
+          object.geometry.dispose();
+          if (object.material.isMaterial) {
+            object.material.dispose();
+          }
+        }
+      });
     };
-  }, [isRotating, modelUrl]);
+  }, [modelUrl]); // Re-run if URL changes (removed isRotating to prevent scene reload on toggle)
 
   const handleRotationToggle = () => {
     setIsRotating(!isRotating);
   };
 
   const handleReset = () => {
-    if (cameraRef.current) {
-      cameraRef.current.position.set(0, 2, 5);
-      cameraRef.current.lookAt(0, 0, 0);
-    }
     if (modelRef.current) {
       modelRef.current.rotation.set(0, 0, 0);
     }
@@ -227,14 +267,24 @@ const Model3DViewer = ({ modelUrl, equipmentName }) => {
       {/* 3D Canvas Container */}
       <div ref={mountRef} className="w-full h-full" />
 
-      {/* Placeholder Badge */}
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-50/80 z-10">
+          <div className="flex flex-col items-center gap-2 text-indigo-600">
+            <Loader2 className="w-8 h-8 animate-spin" />
+            <span className="text-xs font-semibold">Loading Model...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Badge */}
       <div className="absolute top-2 left-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-sm flex items-center gap-1">
         <Box className="w-3 h-3" />
         3D MODEL
       </div>
 
       {/* Controls */}
-      <div className="absolute bottom-2 right-2 flex gap-2">
+      <div className="absolute bottom-2 right-2 flex gap-2 z-20">
         <button
           onClick={handleRotationToggle}
           className="p-2 bg-white/90 hover:bg-white rounded-lg shadow-md transition-all border border-slate-200"
