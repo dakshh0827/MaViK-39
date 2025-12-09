@@ -1,7 +1,7 @@
-// frontend/src/pages/dashboards/LabAnalyticsPage.jsx
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
+import * as THREE from "three";
 import {
   BarChart,
   Bar,
@@ -64,6 +64,7 @@ const QUALIFICATION_DB = {
   lathe: {
     title: "CNC Lathe Operator",
     url: "https://nqr.gov.in/qualifications/11405",
+    modelUrl: "/models/cnc-lathe.obj", // ADD YOUR .OBJ FILE PATH HERE
     stats: {
       Theory: 40,
       Practical: 80,
@@ -74,6 +75,7 @@ const QUALIFICATION_DB = {
   drill: {
     title: "Bench Drill Operator",
     url: "https://nqr.gov.in/qualifications/12082",
+    modelUrl: "/models/bench-drill.obj", // ADD YOUR .OBJ FILE PATH HERE
     stats: {
       Theory: 60,
       Practical: 150,
@@ -84,6 +86,7 @@ const QUALIFICATION_DB = {
   weld: {
     title: "Arc Welding Specialist",
     url: "https://nqr.gov.in/qualifications/14234",
+    modelUrl: "/models/arc-welder.obj", // ADD YOUR .OBJ FILE PATH HERE
     stats: {
       Theory: 120,
       Practical: 180,
@@ -94,6 +97,7 @@ const QUALIFICATION_DB = {
   laser: {
     title: "Laser Engraver",
     url: "https://nqr.gov.in/qualifications/13977",
+    modelUrl: "/models/laser-engraver.obj", // ADD YOUR .OBJ FILE PATH HERE
     stats: {
       Theory: 150,
       Practical: 180,
@@ -101,6 +105,162 @@ const QUALIFICATION_DB = {
       "OJT(Mandatory)": 180,
     },
   },
+};
+
+const Model3DViewer = ({ modelUrl, equipmentName }) => {
+  const mountRef = useRef(null);
+  const sceneRef = useRef(null);
+  const cameraRef = useRef(null);
+  const rendererRef = useRef(null);
+  const modelRef = useRef(null);
+  const animationIdRef = useRef(null);
+  const [isRotating, setIsRotating] = useState(true);
+
+  useEffect(() => {
+    if (!mountRef.current) return;
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf8fafc);
+    sceneRef.current = scene;
+
+    // Camera setup
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      mountRef.current.clientWidth / mountRef.current.clientHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 2, 5);
+    camera.lookAt(0, 0, 0);
+    cameraRef.current = camera;
+
+    // Renderer setup
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(
+      mountRef.current.clientWidth,
+      mountRef.current.clientHeight
+    );
+    renderer.setPixelRatio(window.devicePixelRatio);
+    mountRef.current.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight1.position.set(5, 5, 5);
+    scene.add(directionalLight1);
+
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    directionalLight2.position.set(-5, 3, -5);
+    scene.add(directionalLight2);
+
+    // Placeholder geometry (will be replaced with OBJ loader)
+    // TODO: Replace this with OBJLoader when you add your models
+    const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x6366f1,
+      metalness: 0.3,
+      roughness: 0.4,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    modelRef.current = mesh;
+
+    // Animation loop
+    const animate = () => {
+      animationIdRef.current = requestAnimationFrame(animate);
+
+      if (isRotating && modelRef.current) {
+        modelRef.current.rotation.y += 0.005;
+      }
+
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    // Handle resize
+    const handleResize = () => {
+      if (!mountRef.current) return;
+      const width = mountRef.current.clientWidth;
+      const height = mountRef.current.clientHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    };
+    window.addEventListener("resize", handleResize);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+      }
+      if (mountRef.current && renderer.domElement) {
+        mountRef.current.removeChild(renderer.domElement);
+      }
+      geometry.dispose();
+      material.dispose();
+      renderer.dispose();
+    };
+  }, [isRotating, modelUrl]);
+
+  const handleRotationToggle = () => {
+    setIsRotating(!isRotating);
+  };
+
+  const handleReset = () => {
+    if (cameraRef.current) {
+      cameraRef.current.position.set(0, 2, 5);
+      cameraRef.current.lookAt(0, 0, 0);
+    }
+    if (modelRef.current) {
+      modelRef.current.rotation.set(0, 0, 0);
+    }
+  };
+
+  return (
+    <div className="relative w-full h-full bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg overflow-hidden border border-slate-200">
+      {/* 3D Canvas Container */}
+      <div ref={mountRef} className="w-full h-full" />
+
+      {/* Placeholder Badge */}
+      <div className="absolute top-2 left-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-sm flex items-center gap-1">
+        <Box className="w-3 h-3" />
+        3D MODEL
+      </div>
+
+      {/* Controls */}
+      <div className="absolute bottom-2 right-2 flex gap-2">
+        <button
+          onClick={handleRotationToggle}
+          className="p-2 bg-white/90 hover:bg-white rounded-lg shadow-md transition-all border border-slate-200"
+          title={isRotating ? "Pause Rotation" : "Resume Rotation"}
+        >
+          <Activity
+            className={`w-4 h-4 text-slate-700 ${
+              isRotating ? "animate-pulse" : ""
+            }`}
+          />
+        </button>
+        <button
+          onClick={handleReset}
+          className="p-2 bg-white/90 hover:bg-white rounded-lg shadow-md transition-all border border-slate-200"
+          title="Reset View"
+        >
+          <Box className="w-4 h-4 text-slate-700" />
+        </button>
+      </div>
+
+      {/* Model Info */}
+      <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[9px] px-2 py-1 rounded max-w-[180px] truncate">
+        {equipmentName}
+      </div>
+    </div>
+  );
 };
 
 // Helper to find qualification data based on equipment name
@@ -918,8 +1078,7 @@ export default function LabAnalyticsPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {labData.equipment.map((eq) => {
                     const live = liveUpdates[eq.id];
-                    const isFresh =
-                      live && new Date() - live.updatedAt < 5000;
+                    const isFresh = live && new Date() - live.updatedAt < 5000;
 
                     // --- STEP 1: Determine Lock State ---
                     const isLocked =
@@ -1115,13 +1274,11 @@ export default function LabAnalyticsPage() {
 
                         {/* Energy */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                          {isLocked ? (
-                            "-"
-                          ) : energyVal ? (
-                            energyVal.toFixed(0)
-                          ) : (
-                            "-"
-                          )}
+                          {isLocked
+                            ? "-"
+                            : energyVal
+                            ? energyVal.toFixed(0)
+                            : "-"}
                         </td>
                       </tr>
                     );
@@ -1131,45 +1288,59 @@ export default function LabAnalyticsPage() {
             </div>
           </div>
         )}
-
         {/* Qualification Standards & Data Section */}
         {uniqueQualifications.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
               <BookOpen className="text-indigo-600 w-5 h-5" />
-              Qualification Standards & Curriculum
+              Qualification Standards & Curriculum with 3D Equipment Models
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="space-y-6">
               {uniqueQualifications.map((item, idx) => (
                 <div
                   key={idx}
-                  className="bg-indigo-50/50 rounded-lg border border-indigo-100 p-4"
+                  className="bg-indigo-50/30 rounded-xl border border-indigo-100 overflow-hidden flex flex-col md:flex-row"
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <h4 className="font-semibold text-gray-900 text-sm">
-                      {item.title}
-                    </h4>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-800"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
+                  {/* 3D Model Viewer Section - Left Side */}
+                  <div className="w-full md:w-2/5 h-[280px] md:h-[320px] bg-slate-100">
+                    <Model3DViewer
+                      modelUrl={item.modelUrl}
+                      equipmentName={item.title}
+                    />
                   </div>
-                  <div className="space-y-2">
-                    {Object.entries(item.stats).map(([label, value]) => (
-                      <div
-                        key={label}
-                        className="flex justify-between items-center text-sm border-b border-indigo-100 last:border-0 py-1"
+                  {/* Qualification Info Section - Right Side */}
+                  <div className="w-full md:w-3/5 p-6 flex flex-col justify-center">
+                    <div className="flex justify-between items-start mb-6">
+                      <h4 className="font-semibold text-gray-900 text-lg">
+                        {item.title}
+                      </h4>
+
+                      {/* FIXED: Added the missing opening <a> tag here */}
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                        title="View NQR Details"
                       >
-                        <span className="text-gray-600 font-medium">
-                          {label}
-                        </span>
-                        <span className="text-gray-900 font-bold">{value}</span>
-                      </div>
-                    ))}
+                        <ExternalLink className="w-5 h-5" />
+                      </a>
+                    </div>
+                    <div className="space-y-3">
+                      {Object.entries(item.stats).map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="flex justify-between items-center text-sm border-b border-indigo-100 last:border-0 pb-3 last:pb-0"
+                        >
+                          <span className="text-gray-600 font-medium">
+                            {label}
+                          </span>
+                          <span className="text-gray-900 font-bold">
+                            {value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
