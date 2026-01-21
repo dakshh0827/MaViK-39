@@ -2,7 +2,7 @@ import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
 
 // Use env var for ngrok support, fallback to local API
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL || "https://mavik-39.onrender.com/api";
 
 console.log('🔧 API URL configured:', API_URL);
 
