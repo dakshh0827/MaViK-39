@@ -2,7 +2,7 @@ import axios from "axios";
 import logger from "../utils/logger.js";
 
 // URL for the Flask ML Service
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:1240";
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "https://dakshh04-MaViK-39-ML-Model.hf.space";
 
 class MLService {
   /**
