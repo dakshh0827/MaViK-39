@@ -51,7 +51,7 @@ class MLService {
       );
       // ------------------
 
-      const response = await axios.post(`${ML_SERVICE_URL}/predict`, payload);
+      const response = await axios.post(`${ML_SERVICE_URL}/predict`, payload, {60000});
 
       // --- LOG RESPONSE ---
       logger.info(`✅ [ML Service] Response: ${JSON.stringify(response.data)}`);
